@@ -258,16 +258,7 @@ export const curricula: Curriculum[] = [
           { name: 'Food Security in India', estimatedHours: 6, difficulty: 'medium' }
         ]
       }
-    ],
-    sources: [{
-      name: 'NCERT',
-      url: 'https://ncert.nic.in/',
-      type: 'official' as const,
-      lastUpdated: new Date().toISOString(),
-      reliability: 'high' as const
-    }],
-    lastVerified: new Date().toISOString(),
-    accuracy: 95
+    ]
   },
   {
     id: 'igcse-9-international',
