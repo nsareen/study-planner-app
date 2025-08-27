@@ -154,22 +154,40 @@ const SmartPlanner: React.FC = () => {
 
   const handleDrop = (e: React.DragEvent, day: PlannerDay) => {
     e.preventDefault();
-    if (!draggedChapter) return;
     
-    const defaultHours = subjectDefaults.get(draggedChapter.subject) || { study: 2, revision: 1 };
-    const plannedMinutes = draggedTaskType === 'study' 
-      ? (draggedChapter.studyHours || defaultHours.study) * 60
-      : (draggedChapter.revisionHours || defaultHours.revision) * 60;
+    // Handle both drag-and-drop and date picker modal
+    let chapter: Chapter | null = draggedChapter;
+    let taskType: 'study' | 'revision' = draggedTaskType;
+    
+    // Check if this is from the date picker modal
+    if (!chapter && e.dataTransfer?.getData) {
+      try {
+        const data = JSON.parse(e.dataTransfer.getData('text/plain') || '{}');
+        if (data.chapter && data.type) {
+          chapter = data.chapter;
+          taskType = data.type;
+        }
+      } catch (err) {
+        console.error('Failed to parse drop data:', err);
+      }
+    }
+    
+    if (!chapter) return;
+    
+    const defaultHours = subjectDefaults.get(chapter.subject) || { study: 2, revision: 1 };
+    const plannedMinutes = taskType === 'study' 
+      ? (chapter.studyHours || defaultHours.study) * 60
+      : (chapter.revisionHours || defaultHours.revision) * 60;
     
     const newTask: PlannerTask = {
       id: `task-${Date.now()}`,
-      chapterId: draggedChapter.id,
-      subject: draggedChapter.subject,
-      chapterName: draggedChapter.name,
-      taskType: draggedTaskType,
+      chapterId: chapter.id,
+      subject: chapter.subject,
+      chapterName: chapter.name,
+      taskType: taskType,
       plannedMinutes,
       status: 'scheduled',
-      confidence: draggedChapter.confidence || 'medium'
+      confidence: chapter.confidence || 'medium'
     };
     
     const updatedDays = plannerDays.map(d => {

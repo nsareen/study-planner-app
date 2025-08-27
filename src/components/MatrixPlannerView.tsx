@@ -512,15 +512,20 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
           <div className="bg-white rounded-xl shadow-lg p-4">
             <FlexibleCalendar
               chapters={chapters}
-              exams={[]} // Will be passed from parent later
-              plannedTasks={plannerDays.flatMap(day => day.plannedTasks)}
+              exams={exams}
+              plannedTasks={plannerDays.flatMap(day => 
+                day.plannedTasks.map(task => ({
+                  ...task,
+                  date: format(new Date(day.date), 'yyyy-MM-dd')
+                }))
+              )}
               onDateSelect={(date, type) => {
                 // Handle date selection for adding chapters
                 console.log('Date selected:', date, type);
               }}
               onChapterStatusUpdate={(chapterId, status) => {
                 // This will be connected to proper status update
-                console.log('Status update:', chapterId, status);
+                onUpdateChapterStatus?.(chapterId, { status: status as any });
               }}
             />
           </div>

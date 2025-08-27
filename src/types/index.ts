@@ -58,14 +58,17 @@ export interface Chapter {
   subject: string;
   name: string;
   estimatedHours: number; // For backward compatibility
-  studyHours: number; // New: Time to study the chapter first time
-  revisionHours: number; // New: Time to revise the chapter
-  completedStudyHours: number; // New: Actual time spent studying
-  completedRevisionHours: number; // New: Actual time spent revising
+  studyHours: number; // Planned: Time to study the chapter first time
+  revisionHours: number; // Planned: Time to revise the chapter
+  completedStudyHours: number; // Progress: Hours marked as completed
+  completedRevisionHours: number; // Progress: Hours marked as completed
+  actualStudyHours?: number; // Actual: Real time spent studying (from timer or manual input)
+  actualRevisionHours?: number; // Actual: Real time spent revising (from timer or manual input)
   studyProgress?: number; // Progress tracking for compatibility
   status: ChapterStatus;
   studyStatus: 'not-done' | 'in-progress' | 'done';
   revisionStatus: 'not-done' | 'in-progress' | 'done';
+  plannedStatus?: 'not-planned' | 'planned' | 'scheduled'; // New: Track if added to calendar
   priority?: number;
   confidence?: 'low' | 'medium' | 'high';
   lastStudiedAt?: string;
