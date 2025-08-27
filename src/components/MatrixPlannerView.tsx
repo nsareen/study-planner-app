@@ -17,12 +17,14 @@ interface MatrixPlannerViewProps {
   onDragOver: (e: React.DragEvent) => void;
   onStartTask: (task: PlannerTask) => void;
   onUpdateChapterHours?: (chapterId: string, studyHours: number, revisionHours: number) => void;
+  onUpdateChapterStatus?: (chapterId: string, updates: Partial<Chapter>) => void;
   onDeleteChapter?: (chapterId: string) => void;
   onResetChapter?: (chapterId: string) => void;
   onDeleteSubject?: (subject: string) => void;
   selectedExamDate?: Date | null;
   selectedChapterIds?: string[];
   onToggleChapterSelection?: (chapterId: string) => void;
+  exams?: Exam[];
 }
 
 const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
@@ -32,19 +34,21 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
   onDragOver,
   onStartTask,
   onUpdateChapterHours,
+  onUpdateChapterStatus,
   onDeleteChapter,
   onResetChapter,
   onDeleteSubject,
   selectedExamDate,
   selectedChapterIds = [],
-  onToggleChapterSelection
+  onToggleChapterSelection,
+  exams = []
 }) => {
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<{ chapterId: string; type: 'study' | 'revision' } | null>(null);
   const [tempHours, setTempHours] = useState<number>(0);
   const [showDatePicker, setShowDatePicker] = useState<{ chapter: Chapter; type: 'study' | 'revision' } | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [showFullCalendar, setShowFullCalendar] = useState(true); // Default to showing full calendar
   const [calendarView, setCalendarView] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const startDate = startOfDay(new Date());
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
@@ -125,17 +129,27 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
 
   // Status management functions
   const handleToggleStudyStatus = (chapter: Chapter) => {
-    const nextStatus = chapter.studyStatus === 'not-done' ? 'in-progress' : 
-                      chapter.studyStatus === 'in-progress' ? 'done' : 'not-done';
-    onUpdateChapterHours?.(chapter.id, chapter.studyHours || 2, chapter.revisionHours || 1);
-    // This would need to be connected to a proper status update function
+    const currentStatus = chapter.studyStatus || 'not-done';
+    const nextStatus = currentStatus === 'not-done' ? 'in-progress' : 
+                      currentStatus === 'in-progress' ? 'done' : 'not-done';
+    
+    onUpdateChapterStatus?.(chapter.id, { 
+      studyStatus: nextStatus,
+      completedStudyHours: nextStatus === 'done' ? (chapter.studyHours || chapter.estimatedHours || 2) : 
+                          nextStatus === 'in-progress' ? (chapter.completedStudyHours || 0) : 0
+    });
   };
 
   const handleToggleRevisionStatus = (chapter: Chapter) => {
-    const nextStatus = chapter.revisionStatus === 'not-done' ? 'in-progress' : 
-                      chapter.revisionStatus === 'in-progress' ? 'done' : 'not-done';
-    onUpdateChapterHours?.(chapter.id, chapter.studyHours || 2, chapter.revisionHours || 1);
-    // This would need to be connected to a proper status update function
+    const currentStatus = chapter.revisionStatus || 'not-done';
+    const nextStatus = currentStatus === 'not-done' ? 'in-progress' : 
+                      currentStatus === 'in-progress' ? 'done' : 'not-done';
+    
+    onUpdateChapterStatus?.(chapter.id, { 
+      revisionStatus: nextStatus,
+      completedRevisionHours: nextStatus === 'done' ? (chapter.revisionHours || 1) : 
+                              nextStatus === 'in-progress' ? (chapter.completedRevisionHours || 0) : 0
+    });
   };
 
   // Get tasks for a specific date
@@ -176,8 +190,11 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
 
   return (
     <div className="bg-white rounded-2xl shadow-xl p-4">
-      {/* Top Section: Chapter Matrix */}
-      <div className="mb-6">
+      {/* Grid Layout: Side-by-side on desktop, stacked on mobile */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* Left Section: Chapter Matrix */}
+        <div className="lg:col-span-1">
         <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-blue-500" />
           Subjects & Chapters Matrix
@@ -473,10 +490,10 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Enhanced Calendar Section with Flexible Views */}
-      <div className="mb-6">
+        </div>
+        
+        {/* Right Section: Enhanced Calendar with Flexible Views */}
+        <div className="lg:col-span-1">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
             <Calendar className="w-5 h-5 text-purple-500" />
@@ -569,10 +586,11 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
             })}
           </div>
         )}
+        </div>
       </div>
-
-      {/* Bottom Section: Metrics */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      
+      {/* Bottom Section: Full Width Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
         {/* Subject-wise Metrics */}
         <div className="lg:col-span-2">
           <h4 className="font-semibold text-gray-700 mb-2">Subject-wise Progress</h4>

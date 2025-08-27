@@ -693,10 +693,12 @@ const SmartPlanner: React.FC = () => {
           <MatrixPlannerView 
             chapters={chapters}
             plannerDays={plannerDays}
+            exams={exams}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
             onStartTask={startTask}
             onUpdateChapterHours={handleUpdateChapterHours}
+            onUpdateChapterStatus={updateChapter}
             onDeleteChapter={handleDeleteChapter}
             onResetChapter={handleResetChapter}
             onDeleteSubject={handleDeleteSubject}
