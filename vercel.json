@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "study-planner-app",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build && cp public/icon.svg dist/",
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
