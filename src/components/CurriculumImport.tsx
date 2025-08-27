@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, BookOpen, Download, CheckCircle, Clock, Brain, Zap, Globe, GraduationCap, ExternalLink, Shield, Plus, AlertTriangle } from 'lucide-react';
-import { curricula, getChapterSuggestions, searchCurricula, Curriculum, CurriculumSubject } from '../data/curricula';
+import { X, Search, BookOpen, Download, CheckCircle, Clock, Brain, Zap, Globe, GraduationCap, ExternalLink, Shield, Plus } from 'lucide-react';
+import { curricula } from '../data/curricula';
+import type { Curriculum, CurriculumSubject } from '../data/curricula';
 import { useStore } from '../store/useStore';
 import SimpleCurriculumSourceManager from './SimpleCurriculumSourceManager';
 
@@ -18,7 +19,7 @@ const CurriculumImport: React.FC<CurriculumImportProps> = ({ isOpen, onClose }) 
   const [customizedSubjects, setCustomizedSubjects] = useState<CurriculumSubject[]>([]);
   const [importProgress, setImportProgress] = useState(0);
   const [showSourceManager, setShowSourceManager] = useState(false);
-  const [customCurricula, setCustomCurricula] = useState<Curriculum[]>([]);
+  const [customCurricula] = useState<Curriculum[]>([]);
 
   const allCurricula = [...curricula, ...customCurricula];
   const filteredCurricula = searchQuery 
@@ -62,7 +63,14 @@ const CurriculumImport: React.FC<CurriculumImportProps> = ({ isOpen, onClose }) 
         addChapter({
           subject: subject.name,
           name: chapter.name,
-          estimatedHours: chapter.estimatedHours
+          estimatedHours: chapter.estimatedHours,
+          studyHours: chapter.estimatedHours || 2,
+          revisionHours: 1,
+          completedStudyHours: 0,
+          completedRevisionHours: 0,
+          studyStatus: 'not-done' as const,
+          revisionStatus: 'not-done' as const,
+          confidence: 'medium' as const
         });
         
         importedChapters++;
@@ -152,7 +160,14 @@ const CurriculumImport: React.FC<CurriculumImportProps> = ({ isOpen, onClose }) 
           addChapter({
             subject: subject.name,
             name: chapter.name,
-            estimatedHours: chapter.estimatedHours
+            estimatedHours: chapter.estimatedHours,
+            studyHours: chapter.estimatedHours || 2,
+            revisionHours: 1,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            studyStatus: 'not-done' as const,
+            revisionStatus: 'not-done' as const,
+            confidence: 'medium' as const
           });
           
           importedChapters++;

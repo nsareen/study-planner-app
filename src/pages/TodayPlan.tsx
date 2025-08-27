@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { generateDailyPlan } from '../utils/prioritization';
-import { DailyTask } from '../types';
+import type { DailyTask } from '../types';
 import { Clock, Play, Pause, Check, SkipForward, RefreshCw, Flame, Star, Sparkles, Target, Trophy, Zap, Coffee, BookOpen, Calendar, HelpCircle } from 'lucide-react';
 import { format } from 'date-fns';
 

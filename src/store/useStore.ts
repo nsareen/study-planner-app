@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppState, Exam, ExamGroup, OffDay, Chapter, DailyLog, AppSettings, DailyTask, UserProfile, StudyPlan } from '../types';
+import type { AppState, Exam, ExamGroup, OffDay, Chapter, DailyLog, AppSettings, DailyTask, UserProfile, StudyPlan, ChapterStatus, SubjectConfig } from '../types';
 
 interface StoreActions {
   // User actions
@@ -342,7 +342,7 @@ export const useStore = create<Store>()(
           const newExamGroup = {
             ...examGroup,
             id: examGroup.id || generateId(),
-            createdAt: examGroup.createdAt || new Date().toISOString(),
+            createdAt: new Date().toISOString(),
             lastModified: new Date().toISOString(),
             status: examGroup.status || 'draft',
             version: examGroup.version || 1,
@@ -563,15 +563,15 @@ export const useStore = create<Store>()(
           
           const updatedChapters = state.chapters.map((c) => {
             if (c.id === id) {
-              const completedHours = Math.min(c.completedHours + hours, c.estimatedHours);
-              const status = completedHours === 0 
-                ? 'not-started' 
-                : completedHours >= c.estimatedHours 
-                ? 'completed' 
-                : 'in-progress';
+              const newStudyProgress = Math.min((c.studyProgress || 0) + hours, c.estimatedHours);
+              const status = newStudyProgress === 0 
+                ? 'not_started' 
+                : newStudyProgress >= c.estimatedHours 
+                ? 'complete' 
+                : 'in_progress';
               return {
                 ...c,
-                completedHours,
+                studyProgress: newStudyProgress,
                 status,
                 updatedAt: new Date().toISOString(),
               };

@@ -292,29 +292,7 @@ const KNOWN_SYLLABI: Record<string, ParsedCurriculum> = {
   }
 };
 
-// Intelligent content patterns to look for in HTML
-const SYLLABUS_PATTERNS = {
-  chapterSelectors: [
-    'table tr td', 'table tbody tr', 'li', 'h3', 'h4', 'h5',
-    '.chapter', '.topic', '.syllabus-item', '.curriculum-item',
-    '[data-chapter]', '[data-topic]'
-  ],
-  
-  chapterKeywords: [
-    'chapter', 'unit', 'topic', 'section', 'lesson', 'module',
-    'part', 'syllabus', 'curriculum', 'content'
-  ],
-  
-  subjectKeywords: [
-    'mathematics', 'math', 'maths', 'physics', 'chemistry', 'biology',
-    'english', 'history', 'geography', 'science', 'social'
-  ],
-
-  excludeKeywords: [
-    'advertisement', 'ad', 'banner', 'footer', 'header', 'nav',
-    'menu', 'sidebar', 'related', 'recommended', 'popular'
-  ]
-};
+// Intelligent content patterns to look for in HTML - removed unused variable
 
 export const parseUrlForKnownSyllabus = (url: string): ParsedCurriculum | null => {
   // Extract hostname and path
@@ -739,7 +717,6 @@ const generateIntelligentMockData = (url: string): ParsedCurriculum => {
   const subject = detectSubjectFromUrl(url) || 'General Studies';
   const isICSE = url.toLowerCase().includes('icse');
   const isCBSE = url.toLowerCase().includes('cbse');
-  const urlLower = url.toLowerCase();
   
   let chapters: ParsedChapter[] = [];
   

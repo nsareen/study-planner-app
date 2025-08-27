@@ -1,5 +1,5 @@
-import { Chapter, Exam, OffDay, DailyTask } from '../types';
-import { differenceInDays, parseISO, isSameDay, addDays, isAfter, isBefore } from 'date-fns';
+import type { Chapter, Exam, OffDay, DailyTask } from '../types';
+import { differenceInDays, parseISO, isSameDay, addDays, isAfter } from 'date-fns';
 
 export interface ChapterWithPriority extends Chapter {
   priority: number;
@@ -44,7 +44,7 @@ export function calculateChapterPriority(
   const availableDays = calculateAvailableDays(currentDate, relevantExam.date, offDays);
   
   // Calculate remaining hours
-  const leftHours = Math.max(0, chapter.estimatedHours - chapter.completedHours);
+  const leftHours = Math.max(0, chapter.estimatedHours - (chapter.studyProgress || 0));
   
   // Calculate urgency (0 to 1, higher means more urgent)
   const urgency = daysUntilExam > 0 ? Math.max(0, 1 - (daysUntilExam / 30)) : 1;
@@ -108,7 +108,7 @@ export function generateDailyPlan(
   
   // Calculate priorities for all chapters
   const chaptersWithPriority = chapters
-    .filter((chapter) => chapter.status !== 'completed')
+    .filter((chapter) => chapter.status !== 'complete')
     .map((chapter) => calculateChapterPriority(chapter, exams, offDays, currentDate))
     .sort((a, b) => b.priority - a.priority);
   
@@ -119,7 +119,7 @@ export function generateDailyPlan(
   for (const chapter of chaptersWithPriority) {
     if (remainingMinutes <= 0) break;
     
-    const remainingChapterHours = chapter.estimatedHours - chapter.completedHours;
+    const remainingChapterHours = chapter.estimatedHours - (chapter.studyProgress || 0);
     const remainingChapterMinutes = remainingChapterHours * 60;
     
     if (remainingChapterMinutes <= 0) continue;
@@ -174,11 +174,11 @@ export function getSubjectStats(chapters: Chapter[]): Map<string, {
     
     current.total++;
     current.totalHours += chapter.estimatedHours;
-    current.completedHours += chapter.completedHours;
+    current.completedHours += (chapter.studyProgress || 0);
     
-    if (chapter.status === 'completed') {
+    if (chapter.status === 'complete') {
       current.completed++;
-    } else if (chapter.status === 'in-progress') {
+    } else if (chapter.status === 'in_progress') {
       current.inProgress++;
     }
     

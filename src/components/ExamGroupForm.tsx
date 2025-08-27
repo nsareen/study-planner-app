@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X, Plus, Calendar, Clock, BookOpen, AlertCircle, Save, Copy, FileText } from 'lucide-react';
 import { format, addDays, eachDayOfInterval } from 'date-fns';
 import type { ExamType, SubjectExam, ExamGroup } from '../types';
@@ -120,7 +120,7 @@ const ExamGroupForm: React.FC<ExamGroupFormProps> = ({
     
     // If editing, include the ID
     if (mode === 'edit' && editingGroup) {
-      examGroupData.id = editingGroup.id;
+      (examGroupData as any).id = editingGroup.id;
     }
     
     onSubmit(examGroupData);
@@ -137,7 +137,7 @@ const ExamGroupForm: React.FC<ExamGroupFormProps> = ({
     };
     
     if (mode === 'edit' && editingGroup) {
-      examGroupData.id = editingGroup.id;
+      (examGroupData as any).id = editingGroup.id;
     }
     
     onSubmit(examGroupData);
@@ -147,7 +147,7 @@ const ExamGroupForm: React.FC<ExamGroupFormProps> = ({
     const newExams: SubjectExam[] = [];
     let currentDate = new Date(formData.startDate);
     
-    availableSubjects.forEach((subject, index) => {
+    availableSubjects.forEach((subject) => {
       // Skip weekends
       while (currentDate.getDay() === 0 || currentDate.getDay() === 6) {
         currentDate = addDays(currentDate, 1);

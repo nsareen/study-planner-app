@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Plus, Calendar as CalendarIcon, Trash2, X, Users, Play, Copy, Archive, Edit, FileText, CheckCircle } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { ExamType, ExamGroup } from '../types';
+import type { ExamType, ExamGroup } from '../types';
 import ExamGroupForm from '../components/ExamGroupForm';
 
 const Calendar: React.FC = () => {
