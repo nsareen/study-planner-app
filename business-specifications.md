@@ -38,6 +38,60 @@ A comprehensive, intelligent study planning application designed for 9th grade s
 
 ### 2. Smart Study Planner Module
 
+#### 2.0 Critical Issues Identified (User Feedback - August 2025)
+Based on real-world usage by students, the following critical issues must be addressed:
+
+**Issue 1: Data Persistence & Import/Export**
+- **Problem**: After browser history clear, all data was lost. Import function showed "success" but didn't restore data
+- **Requirements**:
+  - Import must fully restore all user data including chapters, exams, settings, study plans
+  - Validation of imported data integrity
+  - Clear success/failure feedback with details of what was imported
+  - Auto-backup reminders to prevent data loss
+  - Consider cloud backup options for future
+
+**Issue 2: Progress Tracking & Status Management**
+- **Problem**: No option to update daily progress or flag chapter status (planned/in-progress/completed)
+- **Requirements**:
+  - Chapter status flags: Not Started, Planned, In Progress, Study Done, Revision Done, Completed
+  - Daily progress update interface in Smart Planner
+  - Visual status indicators in calendar view
+  - Progress persistence across sessions
+  - Batch status updates for efficiency
+
+**Issue 3: Calendar UX & Flexibility**
+- **Problem**: Calendar limited to weekly view, poor real estate usage, excessive scrolling
+- **Requirements**:
+  - Multiple calendar views: Daily, Weekly, Monthly
+  - Zoom controls for better visibility of long chapter names
+  - Hover tooltips for full chapter details
+  - Reduced vertical scrolling through better layout
+  - Responsive design for different screen sizes
+  - Chapter status visibility in calendar cells
+  - Date picker for adding chapters (replacing drag-drop)
+
+**Issue 4: Smart Timer Integration**
+- **Problem**: No way to start timer for planned chapters, timer doesn't respect study/revision hours
+- **Requirements**:
+  - Timer modes: Single Chapter, Subject (all chapters), Daily (all planned)
+  - Respect planned study/revision hours per chapter
+  - Track actual vs planned time (velocity metrics)
+  - Start timer directly from calendar or planner view
+  - Session type selection (Study/Revision) when starting
+  - Auto-complete and move to next chapter option
+  - Pause/Resume capability with reason tracking
+  - Show daily progress against total planned hours
+
+**Issue 5: Velocity & Performance Metrics**
+- **Problem**: No visibility into study pace (ahead/behind/on-time)
+- **Requirements**:
+  - Real-time velocity indicator during timer sessions
+  - Actual vs Planned time comparison
+  - Performance trends over time
+  - Motivational messaging based on velocity
+  - Daily, weekly, monthly velocity reports
+  - Adjustable targets based on historical performance
+
 #### 2.1 Multiple Study Plans
 - **Active Plan**: One currently executing plan
 - **Archived Plans**: Historical plans for reference
@@ -128,7 +182,54 @@ A comprehensive, intelligent study planning application designed for 9th grade s
 - Optimize based on exam proximity
 - Adjust for student pace
 
-### 5. User Experience Enhancements
+### 5. User Experience Improvements
+
+#### 5.0 Critical UX Issues to Address
+
+**Layout & Navigation**
+- **Current Issues**:
+  - Top-to-bottom layout causes excessive scrolling
+  - Poor real estate usage on wider screens
+  - Navigation text overlapping on smaller screens
+  - Calendar view too cramped in weekly-only mode
+  
+- **Required Improvements**:
+  - Side-by-side layouts for planner and calendar on desktop
+  - Collapsible panels to reduce scrolling
+  - Responsive font sizing to prevent overlaps
+  - Optimal spacing and padding for all screen sizes
+  - Sticky headers for better navigation
+  - Breadcrumb navigation for context
+
+**Calendar Enhancements**
+- **Flexible Views**:
+  - Daily view: Hour-by-hour schedule with chapter blocks
+  - Weekly view: 7-day grid with expandable cells
+  - Monthly view: Calendar grid with summary indicators
+  - Agenda view: List format for mobile devices
+  
+- **Interactive Features**:
+  - Zoom in/out controls (50%, 75%, 100%, 125%, 150%)
+  - Hover tooltips showing full chapter details
+  - Click to expand chapter information
+  - Drag to reschedule (with confirmation)
+  - Right-click context menus for quick actions
+  - Color coding by subject/status/priority
+
+**Visual Feedback**
+- **Status Indicators**:
+  - Clear icons for chapter status
+  - Progress rings/bars in calendar cells
+  - Color gradients for urgency levels
+  - Animation for state changes
+  - Visual diff between planned vs actual
+
+- **Information Density**:
+  - Condensed mode for overview
+  - Detailed mode for planning
+  - Customizable cell information
+  - Smart abbreviations with full text on hover
+  - Priority-based information display
 
 #### 5.1 Multi-User Support
 - Pre-configured student profiles
@@ -165,6 +266,93 @@ A comprehensive, intelligent study planning application designed for 9th grade s
 - Data synchronization
 
 ## Technical Implementation
+
+### Development Guidelines for Vercel Deployment
+
+#### TypeScript Configuration
+- **CRITICAL**: Use `verbatimModuleSyntax: true` in tsconfig.json
+- **Type Imports**: Always use `import type` for TypeScript types
+  ```typescript
+  // ✅ Correct
+  import type { Chapter, Exam } from '../types';
+  
+  // ❌ Incorrect - will fail build
+  import { Chapter, Exam } from '../types';
+  ```
+- **Strict Mode**: Enable all strict TypeScript checks
+- **No Implicit Any**: Ensure all variables have explicit types
+
+#### Tailwind CSS Configuration
+- **CommonJS Configs**: Use `.cjs` extension for config files
+  - `tailwind.config.cjs` instead of `.js`
+  - `postcss.config.cjs` for PostCSS
+- **Content Paths**: Explicitly define all content paths
+  ```javascript
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ]
+  ```
+- **Vite Configuration**: Explicitly configure PostCSS in vite.config.ts
+  ```typescript
+  css: {
+    postcss: {
+      plugins: [
+        tailwindcss('./tailwind.config.cjs'),
+        autoprefixer,
+      ],
+    },
+  }
+  ```
+
+#### Build & Deployment Best Practices
+- **Branch Strategy**: 
+  - Feature branches for development: `feature/[feature-name]`
+  - Bug fix branches: `bugfix/[issue-name]`
+  - Test locally before merging to main
+  - Main branch auto-deploys to Vercel
+- **Local Testing**: Always run `npm run build` before pushing
+- **Bundle Size**: Keep chunks under 500KB
+  - Use dynamic imports for large components
+  - Implement code splitting
+- **Environment Variables**: Use `.env` files for configuration
+  - Never commit sensitive data
+  - Use Vercel environment variables for production
+
+#### Component Development Guidelines
+- **File Structure**: One component per file
+- **Props Interface**: Always define TypeScript interfaces for props
+- **Default Props**: Use default parameters or defaultProps
+- **Error Boundaries**: Wrap complex components
+- **Loading States**: Always handle loading and error states
+- **Accessibility**: Include ARIA labels and keyboard navigation
+
+#### State Management
+- **Zustand Store**: 
+  - Separate slices for different domains
+  - Use immer for immutable updates
+  - Implement proper TypeScript typing
+- **Local Storage**: 
+  - Handle quota exceeded errors
+  - Implement data compression for large datasets
+  - Regular cleanup of old data
+- **Performance**: 
+  - Use React.memo for expensive components
+  - Implement virtual scrolling for long lists
+  - Debounce user inputs
+
+#### CSS & Styling
+- **Mobile First**: Design for mobile, enhance for desktop
+- **Responsive Units**: Use rem/em instead of px where appropriate
+- **CSS Variables**: Define theme variables in CSS
+- **Animation Performance**: Use transform and opacity for animations
+- **Print Styles**: Include print media queries
+
+#### Testing Requirements
+- **Unit Tests**: Test utilities and store functions
+- **Component Tests**: Test user interactions
+- **E2E Tests**: Test critical user flows
+- **Accessibility Tests**: Ensure WCAG compliance
 
 ### Data Models
 
@@ -265,15 +453,73 @@ A comprehensive, intelligent study planning application designed for 9th grade s
    - Educational content platforms
    - Communication tools
 
+## Implementation Status & Resolution
+
+### Completed Enhancements (August 27, 2025)
+Based on the critical user feedback, the following features have been implemented:
+
+#### ✅ Issue 1: Data Persistence & Import/Export
+- **Solution Implemented**: Fixed `importData` function in useStore.ts
+- **Features Added**:
+  - Full data restoration including chapters, exams, settings, and study plans
+  - Data validation before import
+  - Detailed success/failure messages
+  - Version checking for compatibility
+
+#### ✅ Issue 2: Progress Tracking & Status Management  
+- **Solution Implemented**: Enhanced SmartPlanner with status tracking
+- **Features Added**:
+  - Chapter status flags in calendar cells
+  - Visual indicators with colors and icons
+  - Progress persistence in localStorage
+  - Batch operations for status updates
+
+#### ✅ Issue 3: Calendar UX & Flexibility
+- **Solution Implemented**: New FlexibleCalendar component system
+- **Features Added**:
+  - Multiple views: Daily, Weekly, Monthly
+  - Zoom controls (50% to 150%)
+  - Hover tooltips for chapter details
+  - Improved responsive layout
+  - Date picker modal for adding chapters
+  - Status indicators in calendar cells
+
+#### ✅ Issue 4: Smart Timer Integration
+- **Solution Implemented**: SmartTimer component with velocity tracking
+- **Features Added**:
+  - Three modes: Single, Subject, Daily
+  - Respects planned study/revision hours
+  - Session type selection
+  - Auto-progression to next chapter
+  - Pause/Resume with elapsed time tracking
+  - Integration with calendar view
+
+#### ✅ Issue 5: Velocity & Performance Metrics
+- **Solution Implemented**: VelocityIndicator component
+- **Features Added**:
+  - Real-time velocity tracking (ahead/on-time/behind)
+  - Actual vs Planned time comparison
+  - Visual meter with percentage
+  - Motivational messages based on performance
+  - Efficiency calculations
+  - Color-coded status indicators
+
+### Technical Compliance Achieved
+- ✅ TypeScript `verbatimModuleSyntax` compliance with type-only imports
+- ✅ CommonJS configuration files for Vercel deployment
+- ✅ Proper PostCSS configuration in Vite
+- ✅ Responsive design implementation
+- ✅ Branch-based development workflow established
+
 ## Implementation Phases
 
-### Phase 1: Core Functionality (Current)
+### Phase 1: Core Functionality (Completed)
 - Basic exam management
 - Single study plan
 - Matrix view with calendar
 - Chapter management
 
-### Phase 2: Enhanced Planning (In Progress)
+### Phase 2: Enhanced Planning (Completed - August 27, 2025)
 - Exam groups with multiple dates
 - Multiple study plans
 - Plan versioning
@@ -315,6 +561,14 @@ A comprehensive, intelligent study planning application designed for 9th grade s
 
 ---
 
-*Document Version: 1.0*  
+*Document Version: 2.0*  
 *Last Updated: August 27, 2025*  
-*Status: In Development*
+*Status: Phase 2 Completed - Ready for User Testing*
+
+## Revision History
+- **v2.0 (August 27, 2025)**: Major update based on user feedback
+  - Added critical issues and resolutions
+  - Documented completed implementations
+  - Added Vercel deployment guidelines
+  - Updated UX requirements
+- **v1.0 (August 2025)**: Initial specification document
