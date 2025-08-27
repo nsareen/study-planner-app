@@ -97,7 +97,7 @@ const EnhancedMatrixEditor: React.FC<EnhancedMatrixEditorProps> = ({
       revisionHours: tempRevisionHours,
       completedStudyHours: 0,
       completedRevisionHours: 0,
-      status: 'not-started',
+      status: 'not_started',
       studyStatus: 'not-done',
       revisionStatus: 'not-done'
     });
@@ -118,7 +118,7 @@ const EnhancedMatrixEditor: React.FC<EnhancedMatrixEditorProps> = ({
         revisionHours: 1,
         completedStudyHours: 0,
         completedRevisionHours: 0,
-        status: 'not-started',
+        status: 'not_started',
         studyStatus: 'not-done',
         revisionStatus: 'not-done'
       });
@@ -151,7 +151,7 @@ const EnhancedMatrixEditor: React.FC<EnhancedMatrixEditorProps> = ({
           revisionStatus: 'not-done',
           completedStudyHours: 0,
           completedRevisionHours: 0,
-          status: 'not-started'
+          status: 'not_started'
         });
         setSelectedChapters(new Set());
         break;
@@ -164,7 +164,7 @@ const EnhancedMatrixEditor: React.FC<EnhancedMatrixEditorProps> = ({
       name: `${chapter.name} (Copy)`,
       completedStudyHours: 0,
       completedRevisionHours: 0,
-      status: 'not-started',
+      status: 'not_started',
       studyStatus: 'not-done',
       revisionStatus: 'not-done'
     });

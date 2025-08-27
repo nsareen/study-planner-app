@@ -44,7 +44,9 @@ export interface OffDay {
 }
 
 export type ChapterStatus = 
-  | 'not-started' 
+  | 'not_started' 
+  | 'in_progress' 
+  | 'complete' 
   | 'study-in-progress' 
   | 'study-completed' 
   | 'revision-in-progress' 
@@ -60,6 +62,7 @@ export interface Chapter {
   revisionHours: number; // New: Time to revise the chapter
   completedStudyHours: number; // New: Actual time spent studying
   completedRevisionHours: number; // New: Actual time spent revising
+  studyProgress?: number; // Progress tracking for compatibility
   status: ChapterStatus;
   studyStatus: 'not-done' | 'in-progress' | 'done';
   revisionStatus: 'not-done' | 'in-progress' | 'done';

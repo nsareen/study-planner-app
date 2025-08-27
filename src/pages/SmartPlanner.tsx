@@ -218,7 +218,7 @@ const SmartPlanner: React.FC = () => {
       revisionStatus: 'not-done',
       completedStudyHours: 0,
       completedRevisionHours: 0,
-      status: 'not-started',
+      status: 'not_started',
     });
   };
 

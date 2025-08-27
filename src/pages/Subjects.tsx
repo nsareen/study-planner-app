@@ -309,7 +309,7 @@ const Subjects: React.FC = () => {
                           <span className="font-medium">{chapter.name}</span>
                           <span className="text-sm text-gray-500 flex items-center gap-1">
                             <Clock size={14} />
-                            {((chapter as any).studyProgress || 0).toFixed(1)}/{chapter.estimatedHours}h
+                            {(chapter.studyProgress || 0).toFixed(1)}/{chapter.estimatedHours}h
                           </span>
                         </div>
                         <div className="flex gap-2">

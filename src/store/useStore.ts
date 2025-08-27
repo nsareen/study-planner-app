@@ -341,7 +341,7 @@ export const useStore = create<Store>()(
           
           const newExamGroup = {
             ...examGroup,
-            id: examGroup.id || generateId(),
+            id: (examGroup as any).id || generateId(),
             createdAt: new Date().toISOString(),
             lastModified: new Date().toISOString(),
             status: examGroup.status || 'draft',
@@ -495,7 +495,8 @@ export const useStore = create<Store>()(
             revisionHours: chapter.revisionHours || 1,
             completedStudyHours: 0,
             completedRevisionHours: 0,
-            status: 'not-started' as const,
+            status: 'not_started' as const,
+            studyProgress: 0,
             studyStatus: 'not-done' as const,
             revisionStatus: 'not-done' as const,
             confidence: 'medium' as const,
@@ -564,11 +565,11 @@ export const useStore = create<Store>()(
           const updatedChapters = state.chapters.map((c) => {
             if (c.id === id) {
               const newStudyProgress = Math.min((c.studyProgress || 0) + hours, c.estimatedHours);
-              const status = newStudyProgress === 0 
+              const status = (newStudyProgress === 0 
                 ? 'not_started' 
                 : newStudyProgress >= c.estimatedHours 
                 ? 'complete' 
-                : 'in_progress';
+                : 'in_progress') as ChapterStatus;
               return {
                 ...c,
                 studyProgress: newStudyProgress,

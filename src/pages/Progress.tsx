@@ -49,7 +49,7 @@ const Progress: React.FC = () => {
   
   const totalStats = useMemo(() => {
     const totalHours = chapters.reduce((acc, ch) => acc + ch.estimatedHours, 0);
-    const completedHours = chapters.reduce((acc, ch) => acc + ((ch as any).studyProgress || 0), 0);
+    const completedHours = chapters.reduce((acc, ch) => acc + (ch.studyProgress || 0), 0);
     const totalChapters = chapters.length;
     const completedChapters = chapters.filter((c) => c.status === 'complete').length;
     
