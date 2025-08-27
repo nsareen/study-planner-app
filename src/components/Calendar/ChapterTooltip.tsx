@@ -1,6 +1,6 @@
 import React from 'react';
 import { Clock, Target, TrendingUp, Calendar, CheckCircle } from 'lucide-react';
-import { Chapter } from '../../types';
+import type { Chapter } from '../../types';
 
 interface ChapterTooltipProps {
   chapter: Chapter;

@@ -11,7 +11,7 @@ import {
   Info
 } from 'lucide-react';
 import { format, addDays, addWeeks, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, isToday } from 'date-fns';
-import { Chapter, Exam } from '../../types';
+import type { Chapter, Exam } from '../../types';
 import CalendarDayCell from './CalendarDayCell';
 import CalendarControls from './CalendarControls';
 import ChapterTooltip from './ChapterTooltip';

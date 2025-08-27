@@ -9,7 +9,7 @@ import {
   AlertCircle,
   Plus
 } from 'lucide-react';
-import { Chapter, Exam } from '../../types';
+import type { Chapter, Exam } from '../../types';
 
 interface CalendarDayCellProps {
   date: Date;
