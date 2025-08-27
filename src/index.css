@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #c91af4;
+  --color-secondary: #00bde6;
+  --color-accent: #FFD93D;
+  --color-background: #f3e8ff;
+  --color-background-alt: #fce4ff;
+  --color-card: rgba(255, 255, 255, 0.9);
+  --color-card-hover: rgba(255, 255, 255, 0.95);
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-border: rgba(255, 255, 255, 0.2);
+  --color-success: #4ECDC4;
+  --color-warning: #FF6B6B;
+  --color-error: #ef4444;
+  --color-info: #00bde6;
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply antialiased;
+    min-height: 100vh;
+  }
+  
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-secondary-500 bg-clip-text text-transparent;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-2xl hover:scale-[1.02];
+  }
+  
+  .glass-effect {
+    @apply backdrop-blur-lg bg-white/90;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  /* Custom slider styles */
+  input[type="range"] {
+    @apply w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer;
+  }
+  
+  input[type="range"]::-webkit-slider-thumb {
+    @apply appearance-none w-6 h-6 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full cursor-pointer shadow-lg transform transition-all hover:scale-110;
+  }
+  
+  input[type="range"]::-moz-range-thumb {
+    @apply w-6 h-6 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full cursor-pointer shadow-lg transform transition-all hover:scale-110 border-0;
+  }
+  
+  input[type="range"]:focus {
+    @apply outline-none;
+  }
+  
+  input[type="range"]::-webkit-slider-runnable-track {
+    @apply w-full h-2 bg-gray-200 rounded-lg;
+  }
+  
+  input[type="range"]::-moz-range-track {
+    @apply w-full h-2 bg-gray-200 rounded-lg;
+  }
+}

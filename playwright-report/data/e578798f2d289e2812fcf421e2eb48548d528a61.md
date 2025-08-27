@@ -1,0 +1,191 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - banner [ref=e5]:
+      - generic [ref=e7]:
+        - generic [ref=e8]:
+          - img [ref=e12]
+          - generic [ref=e15]:
+            - heading "Study Hero" [level=1] [ref=e16]
+            - paragraph [ref=e17]: Welcome back, Ananya! 🚀
+        - navigation [ref=e18]:
+          - link "🎯 Today" [ref=e19] [cursor=pointer]:
+            - /url: /
+            - generic [ref=e20] [cursor=pointer]: 🎯
+            - generic [ref=e21] [cursor=pointer]: Today
+          - link "📚 Subjects" [ref=e22] [cursor=pointer]:
+            - /url: /subjects
+            - generic [ref=e23] [cursor=pointer]: 📚
+            - generic [ref=e24] [cursor=pointer]: Subjects
+          - link "📅 Calendar" [ref=e25] [cursor=pointer]:
+            - /url: /calendar
+            - generic [ref=e26] [cursor=pointer]: 📅
+            - generic [ref=e27] [cursor=pointer]: Calendar
+          - link "👥 Collab" [ref=e28] [cursor=pointer]:
+            - /url: /collaboration
+            - generic [ref=e29] [cursor=pointer]: 👥
+            - generic [ref=e30] [cursor=pointer]: Collab
+          - link "📈 Progress" [ref=e31] [cursor=pointer]:
+            - /url: /progress
+            - generic [ref=e32] [cursor=pointer]: 📈
+            - generic [ref=e33] [cursor=pointer]: Progress
+          - link "❓ Help" [ref=e34] [cursor=pointer]:
+            - /url: /help
+            - generic [ref=e35] [cursor=pointer]: ❓
+            - generic [ref=e36] [cursor=pointer]: Help
+          - link "⚙️ Settings" [ref=e37] [cursor=pointer]:
+            - /url: /settings
+            - generic [ref=e38] [cursor=pointer]: ⚙️
+            - generic [ref=e39] [cursor=pointer]: Settings
+        - generic [ref=e40]:
+          - generic [ref=e41]:
+            - generic [ref=e42]: 👧
+            - generic [ref=e43]:
+              - paragraph [ref=e44]: Ananya
+              - paragraph [ref=e45]: Grade 9th
+          - generic [ref=e46]:
+            - img [ref=e47]
+            - generic [ref=e53]: 🔥 5
+          - generic [ref=e54]:
+            - img [ref=e55]
+            - generic [ref=e57]: Lvl 3
+          - button "Switch User" [ref=e58] [cursor=pointer]:
+            - img [ref=e59] [cursor=pointer]
+    - main [ref=e62]:
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - generic [ref=e67]:
+            - heading "Today's Mission" [level=2] [ref=e68]:
+              - text: Today's Mission
+              - img [ref=e69]
+            - paragraph [ref=e72]: Tuesday, August 26, 2025
+            - paragraph [ref=e73]: Learning in progress! 🚀
+          - button "New Plan" [ref=e74] [cursor=pointer]:
+            - img [ref=e75] [cursor=pointer]
+            - text: New Plan
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - generic [ref=e82]:
+              - paragraph [ref=e83]: Total Time
+              - img [ref=e84]
+            - paragraph [ref=e88]: 0h 0m
+          - generic [ref=e89]:
+            - generic [ref=e90]:
+              - paragraph [ref=e91]: Completed
+              - img [ref=e92]
+            - paragraph [ref=e98]: 0h 0m
+          - generic [ref=e99]:
+            - generic [ref=e100]:
+              - paragraph [ref=e101]: Timer
+              - img [ref=e102]
+            - paragraph [ref=e105]: 00:00
+          - generic [ref=e106]:
+            - generic [ref=e107]:
+              - paragraph [ref=e108]: Progress
+              - img [ref=e109]
+            - paragraph [ref=e111]: 0%
+        - generic [ref=e113]:
+          - img [ref=e114]
+          - heading "Welcome to Study Hero! 🎆" [level=3] [ref=e116]
+          - paragraph [ref=e117]: Let's set up your personalized study plan to ace those exams!
+          - generic [ref=e118]:
+            - heading "Get Started in 2 Minutes:" [level=4] [ref=e119]:
+              - img [ref=e120]
+              - text: "Get Started in 2 Minutes:"
+            - generic [ref=e124]:
+              - generic [ref=e125]:
+                - generic [ref=e126]: "1"
+                - generic [ref=e127]:
+                  - text: Add your subjects and chapters in
+                  - strong [ref=e128]: Subjects
+                  - text: tab
+              - generic [ref=e129]:
+                - generic [ref=e130]: "2"
+                - generic [ref=e131]:
+                  - text: Schedule exam dates in
+                  - strong [ref=e132]: Calendar
+                  - text: tab
+              - generic [ref=e133]:
+                - generic [ref=e134]: "3"
+                - generic [ref=e135]: Get your smart daily study plan right here!
+          - generic [ref=e136]:
+            - link "Add Subjects" [ref=e137] [cursor=pointer]:
+              - /url: /subjects
+              - img [ref=e138] [cursor=pointer]
+              - text: Add Subjects
+            - link "Watch Tutorial" [ref=e140] [cursor=pointer]:
+              - /url: /help
+              - img [ref=e141] [cursor=pointer]
+              - text: Watch Tutorial
+    - generic [ref=e144]:
+      - button "Show Tutorial" [ref=e145] [cursor=pointer]:
+        - img [ref=e146] [cursor=pointer]
+      - img [ref=e150] [cursor=pointer]
+  - generic [ref=e155]:
+    - generic [ref=e157]:
+      - generic [ref=e158]:
+        - img [ref=e160]
+        - generic [ref=e162]:
+          - heading "Welcome to Study Hero! 🚀" [level=2] [ref=e163]
+          - paragraph [ref=e164]: Step 1 of 7
+      - button [ref=e165] [cursor=pointer]:
+        - img [ref=e166] [cursor=pointer]
+    - generic [ref=e169]:
+      - generic [ref=e170]:
+        - button "Welcome to Study Hero! 🚀" [ref=e172] [cursor=pointer]
+        - button "Add Your Subjects & Chapters" [ref=e174] [cursor=pointer]
+        - button "Schedule Your Exams & Off Days" [ref=e176] [cursor=pointer]
+        - button "Your Daily Study Plan" [ref=e178] [cursor=pointer]
+        - button "Study with Friends" [ref=e180] [cursor=pointer]
+        - button "Track Your Progress" [ref=e182] [cursor=pointer]
+        - button "Customize Your Experience" [ref=e184] [cursor=pointer]
+      - generic [ref=e185]:
+        - generic [ref=e186]: Getting Started
+        - generic [ref=e187]: Ready to Study!
+    - generic [ref=e189]:
+      - paragraph [ref=e191]: Your personal study companion designed to help you ace your exams and build amazing study habits.
+      - generic [ref=e192]:
+        - heading "Here's how to get started:" [level=4] [ref=e193]:
+          - img [ref=e194]
+          - text: "Here's how to get started:"
+        - list [ref=e197]:
+          - listitem [ref=e198]:
+            - generic [ref=e199]: "1"
+            - generic [ref=e200]: Track your daily study progress
+          - listitem [ref=e201]:
+            - generic [ref=e202]: "2"
+            - generic [ref=e203]: Collaborate with friends
+          - listitem [ref=e204]:
+            - generic [ref=e205]: "3"
+            - generic [ref=e206]: Smart exam preparation
+          - listitem [ref=e207]:
+            - generic [ref=e208]: "4"
+            - generic [ref=e209]: Gamified learning experience
+      - generic [ref=e210]:
+        - generic [ref=e211]:
+          - generic [ref=e212]: 🎯
+          - heading "Smart Planning" [level=5] [ref=e213]
+          - paragraph [ref=e214]: AI-powered study schedules
+        - generic [ref=e215]:
+          - generic [ref=e216]: 👥
+          - heading "Study Together" [level=5] [ref=e217]
+          - paragraph [ref=e218]: Collaborate with friends
+        - generic [ref=e219]:
+          - generic [ref=e220]: 📊
+          - heading "Track Progress" [level=5] [ref=e221]
+          - paragraph [ref=e222]: Detailed analytics & insights
+        - generic [ref=e223]:
+          - generic [ref=e224]: 🏆
+          - heading "Gamification" [level=5] [ref=e225]
+          - paragraph [ref=e226]: Levels, streaks & achievements
+    - generic [ref=e228]:
+      - button "Previous" [disabled] [ref=e229]:
+        - img [ref=e230]
+        - text: Previous
+      - generic [ref=e232]: 0 of 7 steps completed
+      - button "Next" [ref=e233] [cursor=pointer]:
+        - text: Next
+        - img [ref=e234] [cursor=pointer]
+```
