@@ -74,11 +74,13 @@
   }
   
   input[type="range"]::-webkit-slider-thumb {
-    @apply appearance-none w-6 h-6 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full cursor-pointer shadow-lg transform transition-all hover:scale-110;
+    @apply appearance-none w-6 h-6 rounded-full cursor-pointer shadow-lg transform transition-all hover:scale-110;
+    background: linear-gradient(to right, #e03eff, #00bde6);
   }
   
   input[type="range"]::-moz-range-thumb {
-    @apply w-6 h-6 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full cursor-pointer shadow-lg transform transition-all hover:scale-110 border-0;
+    @apply w-6 h-6 rounded-full cursor-pointer shadow-lg transform transition-all hover:scale-110 border-0;
+    background: linear-gradient(to right, #e03eff, #00bde6);
   }
   
   input[type="range"]:focus {
