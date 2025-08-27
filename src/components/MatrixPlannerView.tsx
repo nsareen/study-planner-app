@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { 
   CheckCircle, Circle, Clock, BookOpen, Target, TrendingUp, 
   Calendar, AlertTriangle, Play, ChevronDown, ChevronUp,
-  RotateCcw, Edit2, Save, X, CalendarPlus, Trash2, RefreshCw
+  RotateCcw, Edit2, Save, X, CalendarPlus, Trash2, RefreshCw,
+  PlayCircle, PauseCircle, CheckSquare, Square
 } from 'lucide-react';
-import type { Chapter, PlannerDay, PlannerTask } from '../types';
+import type { Chapter, PlannerDay, PlannerTask, Exam } from '../types';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import SubjectQuickActions from './SubjectQuickActions';
+import FlexibleCalendar from './Calendar/FlexibleCalendar';
 
 interface MatrixPlannerViewProps {
   chapters: Chapter[];
@@ -42,6 +44,8 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
   const [tempHours, setTempHours] = useState<number>(0);
   const [showDatePicker, setShowDatePicker] = useState<{ chapter: Chapter; type: 'study' | 'revision' } | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const [calendarView, setCalendarView] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const startDate = startOfDay(new Date());
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
   const monthDays = Array.from({ length: 30 }, (_, i) => addDays(startDate, i));
@@ -117,6 +121,21 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
       onUpdateChapterHours(editingCell.chapterId, newStudyHours, newRevisionHours);
     }
     setEditingCell(null);
+  };
+
+  // Status management functions
+  const handleToggleStudyStatus = (chapter: Chapter) => {
+    const nextStatus = chapter.studyStatus === 'not-done' ? 'in-progress' : 
+                      chapter.studyStatus === 'in-progress' ? 'done' : 'not-done';
+    onUpdateChapterHours?.(chapter.id, chapter.studyHours || 2, chapter.revisionHours || 1);
+    // This would need to be connected to a proper status update function
+  };
+
+  const handleToggleRevisionStatus = (chapter: Chapter) => {
+    const nextStatus = chapter.revisionStatus === 'not-done' ? 'in-progress' : 
+                      chapter.revisionStatus === 'in-progress' ? 'done' : 'not-done';
+    onUpdateChapterHours?.(chapter.id, chapter.studyHours || 2, chapter.revisionHours || 1);
+    // This would need to be connected to a proper status update function
   };
 
   // Get tasks for a specific date
@@ -278,24 +297,57 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
                             {chapter.confidence === 'low' && (
                               <AlertTriangle className="w-3 h-3 text-yellow-500" />
                             )}
-                            {/* Action buttons */}
-                            <div className="ml-auto flex gap-1 opacity-0 group-hover:opacity-100">
+                            {/* Status buttons */}
+                            <div className="ml-auto flex items-center gap-2">
+                              {/* Study Status Button */}
                               <button
-                                onClick={() => handleAddToCalendar(chapter, 'study')}
-                                className="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
-                                title="Add study session to calendar"
+                                onClick={() => handleToggleStudyStatus(chapter)}
+                                className={`p-1 rounded transition-colors ${
+                                  chapter.studyStatus === 'done' ? 'text-green-600 bg-green-100' :
+                                  chapter.studyStatus === 'in-progress' ? 'text-blue-600 bg-blue-100' :
+                                  'text-gray-400 hover:text-gray-600'
+                                }`}
+                                title={`Study: ${chapter.studyStatus || 'not started'}`}
                               >
-                                <CalendarPlus className="w-3 h-3" />
-                                Study
+                                {chapter.studyStatus === 'done' ? <CheckSquare size={16} /> :
+                                 chapter.studyStatus === 'in-progress' ? <PlayCircle size={16} /> :
+                                 <Square size={16} />}
                               </button>
+                              
+                              {/* Revision Status Button */}
                               <button
-                                onClick={() => handleAddToCalendar(chapter, 'revision')}
-                                className="px-2 py-1 bg-green-100 text-green-600 rounded text-xs hover:bg-green-200 flex items-center gap-1"
-                                title="Add revision to calendar"
+                                onClick={() => handleToggleRevisionStatus(chapter)}
+                                className={`p-1 rounded transition-colors ${
+                                  chapter.revisionStatus === 'done' ? 'text-green-600 bg-green-100' :
+                                  chapter.revisionStatus === 'in-progress' ? 'text-blue-600 bg-blue-100' :
+                                  'text-gray-400 hover:text-gray-600'
+                                }`}
+                                title={`Revision: ${chapter.revisionStatus || 'not started'}`}
                               >
-                                <CalendarPlus className="w-3 h-3" />
-                                Revise
+                                {chapter.revisionStatus === 'done' ? <CheckCircle size={16} /> :
+                                 chapter.revisionStatus === 'in-progress' ? <PauseCircle size={16} /> :
+                                 <Circle size={16} />}
                               </button>
+                              
+                              {/* Calendar buttons */}
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100">
+                                <button
+                                  onClick={() => handleAddToCalendar(chapter, 'study')}
+                                  className="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs hover:bg-blue-200 flex items-center gap-1"
+                                  title="Add study session to calendar"
+                                >
+                                  <CalendarPlus className="w-3 h-3" />
+                                  Study
+                                </button>
+                                <button
+                                  onClick={() => handleAddToCalendar(chapter, 'revision')}
+                                  className="px-2 py-1 bg-green-100 text-green-600 rounded text-xs hover:bg-green-200 flex items-center gap-1"
+                                  title="Add revision to calendar"
+                                >
+                                  <CalendarPlus className="w-3 h-3" />
+                                  Revise
+                                </button>
+                              </div>
                               {onResetChapter && (
                                 <button
                                   onClick={() => {
@@ -423,73 +475,100 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
         </div>
       </div>
 
-      {/* Middle Section: Calendar Grid */}
+      {/* Enhanced Calendar Section with Flexible Views */}
       <div className="mb-6">
-        <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-purple-500" />
-          Weekly Schedule
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-purple-500" />
+            Study Calendar
+          </h3>
+          <button
+            onClick={() => setShowFullCalendar(!showFullCalendar)}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2"
+          >
+            <Calendar size={18} />
+            {showFullCalendar ? 'Hide Full Calendar' : 'Show Full Calendar'}
+          </button>
+        </div>
         
-        <div className="grid grid-cols-7 gap-2">
-          {weekDays.map((date, index) => {
-            const tasks = getTasksForDate(date);
-            const dayHours = tasks.reduce((sum, task) => sum + (task.plannedMinutes / 60), 0);
-            const isExamDay = selectedExamDate && isSameDay(date, selectedExamDate);
-            
-            return (
-              <div
-                key={index}
-                className={`border-2 rounded-lg p-2 min-h-[150px] transition-all ${
-                  isExamDay 
-                    ? 'border-red-400 bg-red-50 ring-2 ring-red-300' 
-                    : 'border-gray-200 bg-gray-50 hover:bg-blue-50'
-                }`}
-              >
-                <div className="font-semibold text-sm text-gray-700">
-                  {format(date, 'EEE')}
-                </div>
-                <div className="text-xs text-gray-500 mb-2">
-                  {format(date, 'MMM dd')}
-                </div>
-                
-                {isExamDay && (
-                  <div className="text-xs font-bold text-red-600 mb-1">
-                    🎯 EXAM DAY
+        {showFullCalendar ? (
+          <div className="bg-white rounded-xl shadow-lg p-4">
+            <FlexibleCalendar
+              chapters={chapters}
+              exams={[]} // Will be passed from parent later
+              plannedTasks={plannerDays.flatMap(day => day.plannedTasks)}
+              onDateSelect={(date, type) => {
+                // Handle date selection for adding chapters
+                console.log('Date selected:', date, type);
+              }}
+              onChapterStatusUpdate={(chapterId, status) => {
+                // This will be connected to proper status update
+                console.log('Status update:', chapterId, status);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-7 gap-2">
+            {weekDays.map((date, index) => {
+              const tasks = getTasksForDate(date);
+              const dayHours = tasks.reduce((sum, task) => sum + (task.plannedMinutes / 60), 0);
+              const isExamDay = selectedExamDate && isSameDay(date, selectedExamDate);
+              
+              return (
+                <div
+                  key={index}
+                  className={`border-2 rounded-lg p-2 min-h-[150px] transition-all ${
+                    isExamDay 
+                      ? 'border-red-400 bg-red-50 ring-2 ring-red-300' 
+                      : 'border-gray-200 bg-gray-50 hover:bg-blue-50'
+                  }`}
+                >
+                  <div className="font-semibold text-sm text-gray-700">
+                    {format(date, 'EEE')}
                   </div>
-                )}
-                
-                {dayHours > 0 && (
-                  <div className="text-xs font-semibold text-blue-600 mb-1">
-                    {dayHours.toFixed(1)}h planned
+                  <div className="text-xs text-gray-500 mb-2">
+                    {format(date, 'MMM dd')}
                   </div>
-                )}
-                
-                <div className="space-y-1">
-                  {tasks.slice(0, 3).map(task => (
-                    <div
-                      key={task.id}
-                      className={`text-xs p-1 rounded cursor-pointer ${
-                        task.taskType === 'study' 
-                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
-                          : 'bg-green-100 text-green-700 hover:bg-green-200'
-                      }`}
-                      onClick={() => onStartTask(task)}
-                    >
-                      <div className="truncate">
-                        {task.taskType === 'study' ? '📖' : '🔄'} {task.chapterName}
-                      </div>
-                    </div>
-                  ))}
-                  {tasks.length > 3 && (
-                    <div className="text-xs text-gray-500 text-center">
-                      +{tasks.length - 3} more
+                  
+                  {isExamDay && (
+                    <div className="text-xs font-bold text-red-600 mb-1">
+                      🎯 EXAM DAY
                     </div>
                   )}
+                  
+                  {dayHours > 0 && (
+                    <div className="text-xs font-semibold text-blue-600 mb-1">
+                      {dayHours.toFixed(1)}h planned
+                    </div>
+                  )}
+                  
+                  <div className="space-y-1">
+                    {tasks.slice(0, 3).map(task => (
+                      <div
+                        key={task.id}
+                        className={`text-xs p-1 rounded cursor-pointer ${
+                          task.taskType === 'study' 
+                            ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                        onClick={() => onStartTask(task)}
+                      >
+                        <div className="truncate">
+                          {task.taskType === 'study' ? '📖' : '🔄'} {task.chapterName}
+                        </div>
+                      </div>
+                    ))}
+                    {tasks.length > 3 && (
+                      <div className="text-xs text-gray-500 text-center">
+                        +{tasks.length - 3} more
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Bottom Section: Metrics */}
