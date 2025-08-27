@@ -74,7 +74,7 @@ const initialSettings: AppSettings = {
 };
 
 // Pre-configured users for the students
-const preconfiguredUsers: UserProfile[] = [
+const getInitialUsers = (): UserProfile[] => [
   {
     id: 'ananya',
     name: 'Ananya',
@@ -86,8 +86,8 @@ const preconfiguredUsers: UserProfile[] = [
     achievements: ['First Week Complete', 'Math Master'],
     favoriteSubject: 'Mathematics',
     motivationalQuote: 'Every expert was once a beginner!',
-    createdAt: new Date().toISOString(),
-    lastActive: new Date().toISOString(),
+    createdAt: '2025-01-01T00:00:00.000Z',
+    lastActive: '2025-01-01T00:00:00.000Z',
   },
   {
     id: 'saanvi',
@@ -100,8 +100,8 @@ const preconfiguredUsers: UserProfile[] = [
     achievements: ['Science Star'],
     favoriteSubject: 'Science',
     motivationalQuote: 'Dream big, study hard!',
-    createdAt: new Date().toISOString(),
-    lastActive: new Date().toISOString(),
+    createdAt: '2025-01-01T00:00:00.000Z',
+    lastActive: '2025-01-01T00:00:00.000Z',
   },
   {
     id: 'sara',
@@ -114,8 +114,8 @@ const preconfiguredUsers: UserProfile[] = [
     achievements: ['Week Warrior', 'Consistent Learner'],
     favoriteSubject: 'Computer Science',
     motivationalQuote: 'Code your future!',
-    createdAt: new Date().toISOString(),
-    lastActive: new Date().toISOString(),
+    createdAt: '2025-01-01T00:00:00.000Z',
+    lastActive: '2025-01-01T00:00:00.000Z',
   },
   {
     id: 'arshita',
@@ -128,18 +128,16 @@ const preconfiguredUsers: UserProfile[] = [
     achievements: ['Chemistry Champion'],
     favoriteSubject: 'Chemistry',
     motivationalQuote: 'Science is magic that works!',
-    createdAt: new Date().toISOString(),
-    lastActive: new Date().toISOString(),
+    createdAt: '2025-01-01T00:00:00.000Z',
+    lastActive: '2025-01-01T00:00:00.000Z',
   },
 ];
 
 export const useStore = create<Store>()(
   persist(
-    (set, get) => ({
-      // Initial state
-      currentUserId: null,
-      users: preconfiguredUsers,
-      userData: preconfiguredUsers.reduce((acc, user) => ({
+    (set, get) => {
+      const initialUsers = getInitialUsers();
+      const initialUserData = initialUsers.reduce((acc, user) => ({
         ...acc,
         [user.id]: {
           exams: [],
@@ -151,7 +149,13 @@ export const useStore = create<Store>()(
           studyPlans: [],
           activeStudyPlanId: undefined,
         }
-      }), {}),
+      }), {});
+      
+      return {
+      // Initial state
+      currentUserId: null,
+      users: initialUsers,
+      userData: initialUserData,
       currentDate: new Date().toISOString().split('T')[0],
       
       // Computed properties
@@ -825,7 +829,8 @@ export const useStore = create<Store>()(
             chapters: [],
           };
         }),
-    }),
+      };
+    },
     {
       name: 'study-planner-storage',
     }
