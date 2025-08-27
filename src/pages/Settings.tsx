@@ -4,17 +4,20 @@ import { Save, Download, Upload, Trash2, Moon, Sun, Monitor, Palette } from 'luc
 import { themes } from '../utils/themes';
 
 const Settings: React.FC = () => {
-  const { settings, updateSettings, clearAllData, chapters, exams, offDays, dailyLogs } = useStore();
+  const { settings, updateSettings, clearAllData, importData, chapters, exams, examGroups, offDays, dailyLogs, studyPlans } = useStore();
   const [showConfirmClear, setShowConfirmClear] = useState(false);
   
   const handleExport = () => {
     const data = {
       chapters,
       exams,
+      examGroups,
       offDays,
       dailyLogs,
+      studyPlans,
       settings,
       exportDate: new Date().toISOString(),
+      version: '2.0', // Add version for compatibility checking
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -36,14 +39,49 @@ const Settings: React.FC = () => {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
-        // In a real implementation, you would validate and merge the data
-        // For now, we'll just show a success message
-        alert('Data imported successfully! (Note: Full import functionality needs to be implemented)');
+        
+        // Validate data structure
+        if (!data || typeof data !== 'object') {
+          alert('Invalid file format. Please select a valid Study Planner backup file.');
+          return;
+        }
+        
+        // Show confirmation dialog
+        const itemCounts = {
+          chapters: data.chapters?.length || 0,
+          exams: data.exams?.length || 0,
+          examGroups: data.examGroups?.length || 0,
+          offDays: data.offDays?.length || 0,
+          studyPlans: data.studyPlans?.length || 0,
+        };
+        
+        const confirmMessage = `This will import:
+• ${itemCounts.chapters} chapters
+• ${itemCounts.exams} exams
+• ${itemCounts.examGroups} exam groups
+• ${itemCounts.offDays} off days
+• ${itemCounts.studyPlans} study plans
+
+Your current data will be replaced. Continue?`;
+        
+        if (confirm(confirmMessage)) {
+          const success = importData(data);
+          
+          if (success) {
+            alert('✅ Data imported successfully! All your data has been restored.');
+          } else {
+            alert('❌ Import failed. Please check the file and try again.');
+          }
+        }
       } catch (error) {
         alert('Failed to import data. Please check the file format.');
+        console.error('Import error:', error);
       }
     };
     reader.readAsText(file);
+    
+    // Reset the input so the same file can be selected again
+    event.target.value = '';
   };
   
   const handleClearData = () => {

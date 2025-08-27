@@ -51,6 +51,7 @@ interface StoreActions {
   setCurrentDate: (date: string) => void;
   clearAllData: () => void;
   clearAllChapters: () => void;
+  importData: (data: any) => boolean;
   
   // Helper getters for current user data
   exams: Exam[];
@@ -829,6 +830,74 @@ export const useStore = create<Store>()(
             chapters: [],
           };
         }),
+        
+      importData: (data) => {
+        try {
+          const state = get();
+          if (!state.currentUserId) return false;
+          
+          // Validate data structure
+          if (!data || typeof data !== 'object') return false;
+          
+          // Import each data type if it exists
+          const importedData: any = {
+            chapters: data.chapters || [],
+            exams: data.exams || [],
+            examGroups: data.examGroups || [],
+            offDays: data.offDays || [],
+            dailyLogs: data.dailyLogs || [],
+            studyPlans: data.studyPlans || [],
+            settings: data.settings || state.settings,
+          };
+          
+          // Add IDs if missing and validate dates
+          importedData.chapters = importedData.chapters.map((ch: any) => ({
+            ...ch,
+            id: ch.id || generateId(),
+            createdAt: ch.createdAt || new Date().toISOString(),
+            updatedAt: ch.updatedAt || new Date().toISOString(),
+            status: ch.status || 'not_started',
+            studyStatus: ch.studyStatus || 'not-done',
+            revisionStatus: ch.revisionStatus || 'not-done',
+            studyHours: ch.studyHours || ch.estimatedHours || 2,
+            revisionHours: ch.revisionHours || 1,
+            completedStudyHours: ch.completedStudyHours || 0,
+            completedRevisionHours: ch.completedRevisionHours || 0,
+          }));
+          
+          importedData.exams = importedData.exams.map((ex: any) => ({
+            ...ex,
+            id: ex.id || generateId(),
+            createdAt: ex.createdAt || new Date().toISOString(),
+          }));
+          
+          importedData.offDays = importedData.offDays.map((od: any) => ({
+            ...od,
+            id: od.id || generateId(),
+            createdAt: od.createdAt || new Date().toISOString(),
+          }));
+          
+          // Update the store
+          set({
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: importedData
+            },
+            chapters: importedData.chapters,
+            exams: importedData.exams,
+            examGroups: importedData.examGroups,
+            offDays: importedData.offDays,
+            dailyLogs: importedData.dailyLogs,
+            studyPlans: importedData.studyPlans,
+            settings: importedData.settings,
+          });
+          
+          return true;
+        } catch (error) {
+          console.error('Import failed:', error);
+          return false;
+        }
+      },
       };
     },
     {

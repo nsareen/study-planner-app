@@ -13,6 +13,7 @@ import MatrixPlannerView from '../components/MatrixPlannerView';
 import QuickActionsToolbar from '../components/QuickActionsToolbar';
 import StudyPlanManager from '../components/StudyPlanManager';
 import EnhancedMatrixEditor from '../components/EnhancedMatrixEditor';
+import FlexibleCalendar from '../components/Calendar/FlexibleCalendar';
 
 const SmartPlanner: React.FC = () => {
   const [searchParams] = useSearchParams();
