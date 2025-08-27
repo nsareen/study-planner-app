@@ -32,40 +32,8 @@ function App() {
     markOnboardingComplete();
   };
   
-  // CSS Debug Info
-  useEffect(() => {
-    console.log('CSS Debug Info:');
-    console.log('- Stylesheets loaded:', document.styleSheets.length);
-    console.log('- Body classes:', document.body.className);
-    console.log('- Computed style test:', window.getComputedStyle(document.body).backgroundColor);
-    
-    // Check if Tailwind is working
-    const testDiv = document.createElement('div');
-    testDiv.className = 'bg-red-500';
-    document.body.appendChild(testDiv);
-    const bgColor = window.getComputedStyle(testDiv).backgroundColor;
-    console.log('- Tailwind test (bg-red-500):', bgColor);
-    document.body.removeChild(testDiv);
-  }, []);
-  
   if (!currentUserId) {
-    return (
-      <>
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          padding: '10px', 
-          background: 'yellow', 
-          color: 'black',
-          zIndex: 9999,
-          fontSize: '12px'
-        }}>
-          CSS Test: If you see this yellow box, inline styles work. Check console for CSS debug info.
-        </div>
-        <UserSelection />
-      </>
-    );
+    return <UserSelection />;
   }
   
   return (
