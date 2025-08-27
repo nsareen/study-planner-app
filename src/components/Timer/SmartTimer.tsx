@@ -268,6 +268,7 @@ const SmartTimer: React.FC<SmartTimerProps> = ({
       <TimerControls
         isRunning={isRunning}
         isPaused={isPaused}
+        elapsedSeconds={elapsedSeconds}
         onStart={handleStart}
         onPause={handlePause}
         onStop={handleStop}

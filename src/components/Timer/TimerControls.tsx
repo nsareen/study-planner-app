@@ -11,6 +11,7 @@ import {
 interface TimerControlsProps {
   isRunning: boolean;
   isPaused: boolean;
+  elapsedSeconds: number;
   onStart: () => void;
   onPause: () => void;
   onStop: () => void;
@@ -23,6 +24,7 @@ interface TimerControlsProps {
 const TimerControls: React.FC<TimerControlsProps> = ({
   isRunning,
   isPaused,
+  elapsedSeconds,
   onStart,
   onPause,
   onStop,
@@ -106,9 +108,5 @@ const TimerControls: React.FC<TimerControlsProps> = ({
     </div>
   );
 };
-
-// Note: elapsedSeconds is not passed as prop but referenced
-// This should be fixed in actual implementation
-const elapsedSeconds = 0;
 
 export default TimerControls;
