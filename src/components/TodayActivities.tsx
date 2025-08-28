@@ -56,19 +56,43 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
 
   // Track elapsed time for active sessions
   useEffect(() => {
-    if (activeSession && activeSession.isActive) {
-      const interval = setInterval(() => {
-        // Calculate total paused time
-        const totalPausedMs = activeSession.pausedIntervals.reduce((total, interval) => {
-          if (interval.resumedAt) {
-            return total + (new Date(interval.resumedAt).getTime() - new Date(interval.pausedAt).getTime());
-          }
-          return total;
+    if (!activeSession) return;
+    
+    const calculateElapsedTime = () => {
+      // Calculate total time from completed pause intervals (ones that have been resumed)
+      const completedPausedMs = activeSession.pausedIntervals
+        .filter(interval => interval.resumedAt)
+        .reduce((total, interval) => {
+          return total + (new Date(interval.resumedAt!).getTime() - new Date(interval.pausedAt).getTime());
         }, 0);
-        
-        // Calculate elapsed time excluding pauses
-        const activeTime = Date.now() - new Date(activeSession.startTime).getTime() - totalPausedMs;
-        const elapsed = Math.floor(activeTime / 1000);
+      
+      let activeTime;
+      if (activeSession.isActive) {
+        // Currently running - calculate time up to now minus pauses
+        activeTime = Date.now() - new Date(activeSession.startTime).getTime() - completedPausedMs;
+      } else {
+        // Currently paused - calculate time up to when it was paused
+        const currentPause = activeSession.pausedIntervals[activeSession.pausedIntervals.length - 1];
+        if (currentPause && !currentPause.resumedAt) {
+          // Use the pause time as the end point
+          activeTime = new Date(currentPause.pausedAt).getTime() - new Date(activeSession.startTime).getTime() - completedPausedMs;
+        } else {
+          // Fallback calculation
+          activeTime = Date.now() - new Date(activeSession.startTime).getTime() - completedPausedMs;
+        }
+      }
+      
+      return Math.floor(activeTime / 1000);
+    };
+    
+    // Set initial elapsed time
+    const elapsed = calculateElapsedTime();
+    setElapsedTimes(prev => new Map(prev).set(activeSession.assignmentId, elapsed));
+    
+    // Only set up interval if session is active
+    if (activeSession.isActive) {
+      const interval = setInterval(() => {
+        const elapsed = calculateElapsedTime();
         setElapsedTimes(prev => new Map(prev).set(activeSession.assignmentId, elapsed));
       }, 1000);
       
@@ -78,19 +102,6 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
         clearInterval(interval);
         timerRefs.current.delete(activeSession.assignmentId);
       };
-    } else if (activeSession && !activeSession.isActive) {
-      // When paused, keep showing the last elapsed time
-      const totalPausedMs = activeSession.pausedIntervals
-        .filter(interval => interval.resumedAt)
-        .reduce((total, interval) => {
-          return total + (new Date(interval.resumedAt!).getTime() - new Date(interval.pausedAt).getTime());
-        }, 0);
-      
-      const lastPausedAt = activeSession.pausedIntervals[activeSession.pausedIntervals.length - 1]?.pausedAt;
-      const pausedTime = lastPausedAt ? new Date(lastPausedAt).getTime() : Date.now();
-      const activeTime = pausedTime - new Date(activeSession.startTime).getTime() - totalPausedMs;
-      const elapsed = Math.floor(activeTime / 1000);
-      setElapsedTimes(prev => new Map(prev).set(activeSession.assignmentId, elapsed));
     }
   }, [activeSession]);
 

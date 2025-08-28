@@ -642,6 +642,28 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
           {activeView === 'today' && (
             <div className="flex-1 p-6 overflow-y-auto bg-gray-50">
               <div className="max-w-4xl mx-auto">
+                {/* Active Timer Display */}
+                {activeSession && (
+                  <div className="mb-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg p-4 shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm opacity-90">Currently Working On</div>
+                        <div className="text-xl font-bold">
+                          {(() => {
+                            const assignment = chapterAssignments.find(a => a.id === activeSession.assignmentId);
+                            const chapter = assignment ? chapters.find(c => c.id === assignment.chapterId) : null;
+                            return chapter ? `${chapter.subject}: ${chapter.name}` : 'Activity';
+                          })()}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-mono font-bold">
+                          {activeSession.isActive ? '⏱️ Running' : '⏸️ Paused'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <TodayActivities
                   assignments={chapterAssignments}
                   chapters={chapters}
@@ -708,6 +730,10 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
                     onAssignmentUpdate={onUpdateAssignment}
                     onAssignmentDelete={onDeleteAssignment}
                     onAssignmentStart={onStartActivity}
+                    onAssignmentClick={(assignment) => {
+                      // Switch to Today view when an assignment is clicked
+                      setActiveView('today');
+                    }}
                   />
                 </div>
               </div>

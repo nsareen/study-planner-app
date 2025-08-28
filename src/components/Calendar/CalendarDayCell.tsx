@@ -176,7 +176,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
         {viewMode !== 'monthly' && studyAssignments.map((assignment, idx) => (
           <div
             key={`study-assign-${idx}`}
-            className="flex items-center gap-1 bg-blue-50 border border-blue-300 rounded px-2 py-1 text-xs hover:bg-blue-100 hover:shadow-md transition-all group cursor-pointer"
+            className="flex items-center gap-1 bg-blue-50 border-2 border-blue-300 rounded-lg px-2 py-1.5 text-xs hover:bg-blue-100 hover:shadow-lg hover:scale-[1.02] transition-all group cursor-pointer"
             title="Click to view/manage this activity"
             onMouseEnter={() => assignment.chapter && onHover({ date: dateStr, chapter: assignment.chapter })}
             onMouseLeave={() => onHover(null)}
@@ -199,6 +199,18 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
             <span className="text-blue-500 text-[10px]">
               {Math.round(assignment.plannedMinutes / 60)}h
             </span>
+            {assignment.status === 'scheduled' && onAssignmentStart && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAssignmentStart(assignment.id);
+                }}
+                className="p-0.5 hover:bg-blue-100 rounded transition-colors"
+                title="Start this activity"
+              >
+                <Play className="w-3 h-3 text-blue-500 hover:text-blue-700" />
+              </button>
+            )}
             {onAssignmentDelete && (
               <button
                 onClick={(e) => {
@@ -207,9 +219,10 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
                     onAssignmentDelete(assignment.id);
                   }
                 }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-red-100 rounded"
+                className="p-0.5 hover:bg-red-100 rounded transition-colors"
+                title="Delete this activity"
               >
-                <Trash2 className="w-3 h-3 text-red-500" />
+                <Trash2 className="w-3 h-3 text-red-500 hover:text-red-700" />
               </button>
             )}
           </div>
@@ -235,7 +248,7 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
         {viewMode !== 'monthly' && revisionAssignments.map((assignment, idx) => (
           <div
             key={`revision-assign-${idx}`}
-            className="flex items-center gap-1 bg-green-50 border border-green-300 rounded px-2 py-1 text-xs hover:bg-green-100 hover:shadow-md transition-all group cursor-pointer"
+            className="flex items-center gap-1 bg-green-50 border-2 border-green-300 rounded-lg px-2 py-1.5 text-xs hover:bg-green-100 hover:shadow-lg hover:scale-[1.02] transition-all group cursor-pointer"
             title="Click to view/manage this activity"
             onMouseEnter={() => assignment.chapter && onHover({ date: dateStr, chapter: assignment.chapter })}
             onMouseLeave={() => onHover(null)}
@@ -258,6 +271,18 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
             <span className="text-green-500 text-[10px]">
               {Math.round(assignment.plannedMinutes / 60)}h
             </span>
+            {assignment.status === 'scheduled' && onAssignmentStart && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAssignmentStart(assignment.id);
+                }}
+                className="p-0.5 hover:bg-green-100 rounded transition-colors"
+                title="Start this activity"
+              >
+                <Play className="w-3 h-3 text-green-500 hover:text-green-700" />
+              </button>
+            )}
             {onAssignmentDelete && (
               <button
                 onClick={(e) => {
@@ -266,9 +291,10 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
                     onAssignmentDelete(assignment.id);
                   }
                 }}
-                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-red-100 rounded"
+                className="p-0.5 hover:bg-red-100 rounded transition-colors"
+                title="Delete this activity"
               >
-                <Trash2 className="w-3 h-3 text-red-500" />
+                <Trash2 className="w-3 h-3 text-red-500 hover:text-red-700" />
               </button>
             )}
           </div>

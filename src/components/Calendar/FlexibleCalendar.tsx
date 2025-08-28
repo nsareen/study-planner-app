@@ -25,6 +25,7 @@ interface FlexibleCalendarProps {
   onAssignmentUpdate?: (assignmentId: string, updates: Partial<ChapterAssignment>) => void;
   onAssignmentDelete?: (assignmentId: string) => void;
   onAssignmentStart?: (assignmentId: string) => void;
+  onAssignmentClick?: (assignment: ChapterAssignment) => void;
 }
 
 type ViewMode = 'daily' | 'weekly' | 'monthly';
@@ -39,6 +40,7 @@ const FlexibleCalendar: React.FC<FlexibleCalendarProps> = ({
   onAssignmentUpdate,
   onAssignmentDelete,
   onAssignmentStart,
+  onAssignmentClick,
 }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('weekly');
@@ -199,6 +201,7 @@ const FlexibleCalendar: React.FC<FlexibleCalendarProps> = ({
                 onAssignmentUpdate={onAssignmentUpdate}
                 onAssignmentDelete={onAssignmentDelete}
                 onAssignmentStart={onAssignmentStart}
+                onAssignmentClick={onAssignmentClick}
               />
             );
           })}
