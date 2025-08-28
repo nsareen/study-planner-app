@@ -283,6 +283,7 @@ export interface AppState {
       activeStudyPlanId?: string; // Currently active plan
       subjectConfigs?: SubjectConfig[]; // New
       historicalPerformance?: HistoricalPerformance; // Historical performance tracking
+      plannerDays: PlannerDay[]; // Calendar tasks and planning data
     };
   };
   currentDate: string;

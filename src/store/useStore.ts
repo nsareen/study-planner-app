@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AppState, Exam, ExamGroup, OffDay, Chapter, DailyLog, AppSettings, DailyTask, UserProfile, StudyPlan, ChapterStatus, SubjectConfig, PerformanceMetric, HistoricalPerformance } from '../types';
+import type { AppState, Exam, ExamGroup, OffDay, Chapter, DailyLog, AppSettings, DailyTask, UserProfile, StudyPlan, ChapterStatus, SubjectConfig, PerformanceMetric, HistoricalPerformance, PlannerDay, PlannerTask } from '../types';
 
 interface StoreActions {
   // User actions
@@ -37,6 +37,15 @@ interface StoreActions {
   addDailyLog: (log: Omit<DailyLog, 'id' | 'createdAt'>) => void;
   updateDailyTask: (logId: string, taskId: string, updates: Partial<DailyTask>) => void;
   
+  // Planner Days actions
+  addPlannerDay: (day: Omit<PlannerDay, 'id'>) => void;
+  updatePlannerDay: (id: string, updates: Partial<PlannerDay>) => void;
+  deletePlannerDay: (id: string) => void;
+  addTaskToPlannerDay: (dayId: string, task: PlannerTask) => void;
+  removeTaskFromPlannerDay: (dayId: string, taskId: string) => void;
+  updatePlannerTask: (dayId: string, taskId: string, updates: Partial<PlannerTask>) => void;
+  getPlannerDayByDate: (date: string) => PlannerDay | undefined;
+  
   // Study Plan actions
   addStudyPlan: (plan: Omit<StudyPlan, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateStudyPlan: (id: string, plan: Partial<StudyPlan>) => void;
@@ -67,6 +76,7 @@ interface StoreActions {
   settings: AppSettings;
   studyPlans: StudyPlan[];
   activeStudyPlanId?: string;
+  plannerDays: PlannerDay[];
 }
 
 type Store = AppState & StoreActions;
@@ -154,6 +164,7 @@ export const useStore = create<Store>()(
           settings: initialSettings,
           studyPlans: [],
           activeStudyPlanId: undefined,
+          plannerDays: [],
         }
       }), {});
       
@@ -173,6 +184,7 @@ export const useStore = create<Store>()(
       settings: initialSettings,
       studyPlans: [],
       activeStudyPlanId: undefined,
+      plannerDays: [],
       
       // User actions
       addUser: (name, avatar, grade) => {
@@ -203,6 +215,7 @@ export const useStore = create<Store>()(
               settings: initialSettings,
               studyPlans: [],
               activeStudyPlanId: undefined,
+              plannerDays: [],
             }
           }
         }));
@@ -222,6 +235,7 @@ export const useStore = create<Store>()(
           settings: initialSettings,
           studyPlans: [],
           activeStudyPlanId: undefined,
+          plannerDays: [],
         };
         
         set({
@@ -234,6 +248,7 @@ export const useStore = create<Store>()(
           settings: userData.settings,
           studyPlans: userData.studyPlans,
           activeStudyPlanId: userData.activeStudyPlanId,
+          plannerDays: userData.plannerDays || [],
         });
         
         // Update last active
@@ -665,6 +680,154 @@ export const useStore = create<Store>()(
           };
         }),
       
+      // Planner Days actions
+      addPlannerDay: (day) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const newDay = {
+            ...day,
+            id: generateId(),
+          };
+          
+          const updatedUserData = {
+            ...state.userData,
+            [state.currentUserId]: {
+              ...state.userData[state.currentUserId],
+              plannerDays: [...(state.userData[state.currentUserId].plannerDays || []), newDay],
+            }
+          };
+          
+          return {
+            userData: updatedUserData,
+            plannerDays: updatedUserData[state.currentUserId].plannerDays,
+          };
+        }),
+      
+      updatePlannerDay: (id, updates) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const updatedPlannerDays = (state.plannerDays || []).map((day) =>
+            day.id === id ? { ...day, ...updates } : day
+          );
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                plannerDays: updatedPlannerDays,
+              }
+            },
+            plannerDays: updatedPlannerDays,
+          };
+        }),
+      
+      deletePlannerDay: (id) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const updatedPlannerDays = (state.plannerDays || []).filter((day) => day.id !== id);
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                plannerDays: updatedPlannerDays,
+              }
+            },
+            plannerDays: updatedPlannerDays,
+          };
+        }),
+      
+      addTaskToPlannerDay: (dayId, task) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const updatedPlannerDays = (state.plannerDays || []).map((day) => {
+            if (day.id === dayId) {
+              return {
+                ...day,
+                plannedTasks: [...day.plannedTasks, task],
+              };
+            }
+            return day;
+          });
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                plannerDays: updatedPlannerDays,
+              }
+            },
+            plannerDays: updatedPlannerDays,
+          };
+        }),
+      
+      removeTaskFromPlannerDay: (dayId, taskId) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const updatedPlannerDays = (state.plannerDays || []).map((day) => {
+            if (day.id === dayId) {
+              return {
+                ...day,
+                plannedTasks: day.plannedTasks.filter((task) => task.id !== taskId),
+              };
+            }
+            return day;
+          });
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                plannerDays: updatedPlannerDays,
+              }
+            },
+            plannerDays: updatedPlannerDays,
+          };
+        }),
+      
+      updatePlannerTask: (dayId, taskId, updates) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const updatedPlannerDays = (state.plannerDays || []).map((day) => {
+            if (day.id === dayId) {
+              return {
+                ...day,
+                plannedTasks: day.plannedTasks.map((task) =>
+                  task.id === taskId ? { ...task, ...updates } : task
+                ),
+              };
+            }
+            return day;
+          });
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                plannerDays: updatedPlannerDays,
+              }
+            },
+            plannerDays: updatedPlannerDays,
+          };
+        }),
+      
+      getPlannerDayByDate: (date) => {
+        const state = get();
+        if (!state.currentUserId) return undefined;
+        return state.plannerDays?.find((day) => day.date === date);
+      },
+      
       // Study Plan actions
       addStudyPlan: (plan) =>
         set((state) => {
@@ -903,6 +1066,7 @@ export const useStore = create<Store>()(
                 settings: initialSettings,
                 studyPlans: [],
                 activeStudyPlanId: undefined,
+                plannerDays: [],
               }
             },
             exams: [],
@@ -913,6 +1077,7 @@ export const useStore = create<Store>()(
             settings: initialSettings,
             studyPlans: [],
             activeStudyPlanId: undefined,
+            plannerDays: [],
           };
         }),
 
