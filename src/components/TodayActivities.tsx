@@ -161,8 +161,12 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
   };
 
   const handleResume = () => {
+    console.log('Resume clicked - activeSession:', activeSession);
     if (activeSession && onResumeActivity) {
+      console.log('Calling onResumeActivity with sessionId:', activeSession.sessionId);
       onResumeActivity(activeSession.sessionId);
+    } else {
+      console.error('Cannot resume - missing session or handler', { activeSession, hasHandler: !!onResumeActivity });
     }
   };
 

@@ -56,32 +56,30 @@ const TodayPlan: React.FC = () => {
     
     // Calculate total paused time
     const calculateElapsedTime = () => {
-      const totalPausedMs = activeSession.pausedIntervals.reduce((total, interval) => {
-        if (interval.resumedAt) {
-          return total + (new Date(interval.resumedAt).getTime() - new Date(interval.pausedAt).getTime());
-        }
-        // Don't count current pause if it's ongoing
-        return total;
-      }, 0);
+      // Calculate total time from completed pause intervals
+      const completedPausedMs = activeSession.pausedIntervals
+        .filter(interval => interval.resumedAt)
+        .reduce((total, interval) => {
+          return total + (new Date(interval.resumedAt!).getTime() - new Date(interval.pausedAt).getTime());
+        }, 0);
       
       let activeTime;
       if (activeSession.isActive) {
-        // Running - calculate up to now
-        activeTime = Date.now() - new Date(activeSession.startTime).getTime() - totalPausedMs;
+        // Currently running - calculate time up to now minus pauses
+        activeTime = Date.now() - new Date(activeSession.startTime).getTime() - completedPausedMs;
       } else {
-        // Paused - calculate up to when it was paused
-        const lastPausedAt = activeSession.pausedIntervals[activeSession.pausedIntervals.length - 1]?.pausedAt;
-        if (lastPausedAt) {
-          // Calculate time up to the pause moment
-          const pausedTime = new Date(lastPausedAt).getTime();
-          activeTime = pausedTime - new Date(activeSession.startTime).getTime() - totalPausedMs;
+        // Currently paused - calculate time up to when it was paused
+        const currentPause = activeSession.pausedIntervals[activeSession.pausedIntervals.length - 1];
+        if (currentPause && !currentPause.resumedAt) {
+          // Use the pause time as the end point
+          activeTime = new Date(currentPause.pausedAt).getTime() - new Date(activeSession.startTime).getTime() - completedPausedMs;
         } else {
-          // No pause info, use current accumulated time
-          activeTime = Date.now() - new Date(activeSession.startTime).getTime() - totalPausedMs;
+          // Fallback - shouldn't happen
+          activeTime = 0;
         }
       }
       
-      return Math.floor(activeTime / 1000);
+      return Math.floor(Math.max(0, activeTime) / 1000);
     };
     
     // Set initial time immediately
@@ -242,8 +240,8 @@ const TodayPlan: React.FC = () => {
               {todaysAssignments.map((assignment) => {
                 const chapter = getChapterForAssignment(assignment);
                 const priorityInfo = getPriorityLabel(0.5); // Default medium priority
-                const isActive = activeSession?.assignmentId === assignment.id;
-                const isPaused = isActive && !activeSession?.isActive;
+                const isActive = activeSession?.assignmentId === assignment.id && activeSession?.isActive;
+                const isPaused = activeSession?.assignmentId === assignment.id && !activeSession?.isActive;
                 const taskTimer = timer[assignment.id] || 0;
                 
                 if (!chapter) return null;
@@ -263,13 +261,15 @@ const TodayPlan: React.FC = () => {
                             <h3 className="text-xl font-bold text-gray-800">{chapter.subject}</h3>
                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                               assignment.status === 'completed' ? 'bg-green-100 text-green-700' :
+                              isActive ? 'bg-blue-100 text-blue-700' :
+                              isPaused ? 'bg-yellow-100 text-yellow-700' :
                               assignment.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                              assignment.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
                               'bg-gray-100 text-gray-700'
                             }`}>
                               {assignment.status === 'completed' ? 'COMPLETED' :
-                               assignment.status === 'in-progress' ? 'IN PROGRESS' :
-                               assignment.status === 'paused' ? 'PAUSED' : 'PENDING'}
+                               isActive ? 'IN PROGRESS' :
+                               isPaused ? 'PAUSED' :
+                               assignment.status === 'in-progress' ? 'IN PROGRESS' : 'PENDING'}
                             </span>
                           </div>
                           <p className="text-gray-700 font-medium">{chapter.name}</p>
@@ -291,7 +291,7 @@ const TodayPlan: React.FC = () => {
                       {/* Action Buttons */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          {!isActive && assignment.status !== 'completed' && (
+                          {!isActive && !isPaused && assignment.status !== 'completed' && assignment.status !== 'in-progress' && (
                             <button
                               onClick={() => handleStartActivity(assignment.id)}
                               className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
@@ -311,7 +311,7 @@ const TodayPlan: React.FC = () => {
                             </button>
                           )}
                           
-                          {isActive && !activeSession?.isActive && (
+                          {isPaused && activeSession && (
                             <button
                               onClick={() => resumeActivity(activeSession.sessionId)}
                               className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -319,7 +319,7 @@ const TodayPlan: React.FC = () => {
                               <Play size={16} />
                               Resume
                             </button>
-                          )}
+                          ))
                           
                           {isActive && (
                             <button
