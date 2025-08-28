@@ -14,6 +14,7 @@ import QuickActionsToolbar from '../components/QuickActionsToolbar';
 import StudyPlanManager from '../components/StudyPlanManager';
 import EnhancedMatrixEditor from '../components/EnhancedMatrixEditor';
 import FlexibleCalendar from '../components/Calendar/FlexibleCalendar';
+import DailyProgress from '../components/DailyProgress';
 
 const SmartPlanner: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -34,7 +35,7 @@ const SmartPlanner: React.FC = () => {
   const [activeTask, setActiveTask] = useState<PlannerTask | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [selectedView, setSelectedView] = useState<'week' | 'month' | 'list' | 'matrix' | 'plans' | 'editor'>(viewParam || 'plans');
+  const [selectedView, setSelectedView] = useState<'week' | 'month' | 'list' | 'matrix' | 'plans' | 'editor' | 'progress'>(viewParam || 'plans');
   const [showTutorial, setShowTutorial] = useState(false);
   const [subjectDefaults] = useState<Map<string, { study: number; revision: number }>>(new Map());
   const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
@@ -513,6 +514,17 @@ const SmartPlanner: React.FC = () => {
                 Matrix
               </button>
               <button
+                onClick={() => setSelectedView('progress')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                  selectedView === 'progress' 
+                    ? 'bg-purple-500 text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Target size={18} />
+                Progress
+              </button>
+              <button
                 onClick={() => setSelectedView('editor')}
                 className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
                   selectedView === 'editor' 
@@ -734,6 +746,12 @@ const SmartPlanner: React.FC = () => {
             onDeleteSubject={handleDeleteSubject}
             onBulkUpdate={handleBulkUpdate}
             onReorderChapters={handleReorderChapters}
+          />
+        ) : selectedView === 'progress' ? (
+          <DailyProgress
+            chapters={chapters}
+            plannerDays={plannerDays}
+            currentDate={currentWeekStart}
           />
         ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

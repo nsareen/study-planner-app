@@ -45,7 +45,7 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
   exams = []
 }) => {
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
-  const [editingCell, setEditingCell] = useState<{ chapterId: string; type: 'study' | 'revision' } | null>(null);
+  const [editingCell, setEditingCell] = useState<{ chapterId: string; type: 'study' | 'revision' | 'actual-study' | 'actual-revision' } | null>(null);
   const [tempHours, setTempHours] = useState<number>(0);
   const [showDatePicker, setShowDatePicker] = useState<{ chapter: Chapter; type: 'study' | 'revision' } | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -122,16 +122,25 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
     }
   };
 
-  const handleEditHours = (chapterId: string, type: 'study' | 'revision', currentHours: number) => {
+  const handleEditHours = (chapterId: string, type: 'study' | 'revision' | 'actual-study' | 'actual-revision', currentHours: number) => {
     setEditingCell({ chapterId, type });
     setTempHours(currentHours);
   };
 
   const handleSaveHours = (chapter: Chapter) => {
-    if (editingCell && onUpdateChapterHours) {
-      const newStudyHours = editingCell.type === 'study' ? tempHours : (chapter.studyHours || 2);
-      const newRevisionHours = editingCell.type === 'revision' ? tempHours : (chapter.revisionHours || 1);
-      onUpdateChapterHours(editingCell.chapterId, newStudyHours, newRevisionHours);
+    if (editingCell) {
+      if (editingCell.type === 'study' || editingCell.type === 'revision') {
+        // Save planned hours
+        if (onUpdateChapterHours) {
+          const newStudyHours = editingCell.type === 'study' ? tempHours : (chapter.studyHours || 2);
+          const newRevisionHours = editingCell.type === 'revision' ? tempHours : (chapter.revisionHours || 1);
+          onUpdateChapterHours(editingCell.chapterId, newStudyHours, newRevisionHours);
+        }
+      } else {
+        // Save actual hours
+        const field = editingCell.type === 'actual-study' ? 'actualStudyHours' : 'actualRevisionHours';
+        onUpdateChapterStatus?.(editingCell.chapterId, { [field]: tempHours });
+      }
     }
     setEditingCell(null);
   };
@@ -258,10 +267,10 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
             <thead>
               <tr className="bg-gray-50">
                 <th className="border p-2 text-left text-sm font-semibold text-gray-700 w-48">Subject / Chapter</th>
-                <th className="border p-2 text-center text-sm text-gray-600 w-20">Study</th>
-                <th className="border p-2 text-center text-sm text-gray-600 w-20">Revision</th>
-                <th className="border p-2 text-center text-sm text-gray-600 w-24">Study Hrs</th>
-                <th className="border p-2 text-center text-sm text-gray-600 w-24">Rev. Hrs</th>
+                <th className="border p-2 text-center text-sm text-gray-600 w-16">Study</th>
+                <th className="border p-2 text-center text-sm text-gray-600 w-16">Revision</th>
+                <th className="border p-2 text-center text-sm text-gray-600 w-20">Planned</th>
+                <th className="border p-2 text-center text-sm text-gray-600 w-20">Actual</th>
                 <th className="border p-2 text-center text-sm text-gray-600 w-24">Progress</th>
               </tr>
             </thead>
@@ -471,61 +480,131 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
                         <td className="border p-2 text-center">
                           {getStatusIcon(chapter.revisionStatus)}
                         </td>
-                        <td className="border p-2 text-center">
-                          {editingCell?.chapterId === chapter.id && editingCell.type === 'study' ? (
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                value={tempHours}
-                                onChange={(e) => setTempHours(parseFloat(e.target.value))}
-                                className="w-12 px-1 border rounded"
-                                step="0.5"
-                                min="0.5"
-                              />
-                              <button onClick={() => handleSaveHours(chapter)}>
-                                <Save className="w-3 h-3 text-green-500" />
+                        <td className="border p-2">
+                          <div className="flex gap-2 justify-center">
+                            {/* Planned Study Hours */}
+                            {editingCell?.chapterId === chapter.id && editingCell.type === 'study' ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  value={tempHours}
+                                  onChange={(e) => setTempHours(parseFloat(e.target.value))}
+                                  className="w-12 px-1 border rounded text-sm"
+                                  step="0.5"
+                                  min="0"
+                                  autoFocus
+                                />
+                                <button onClick={() => handleSaveHours(chapter)}>
+                                  <Save className="w-3 h-3 text-green-500" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleEditHours(chapter.id, 'study', chapter.studyHours || 2)}
+                                className="text-blue-600 hover:bg-blue-50 px-1 rounded text-sm"
+                                title="Planned study hours"
+                              >
+                                S:{chapter.studyHours || 2}h
                               </button>
-                              <button onClick={() => setEditingCell(null)}>
-                                <X className="w-3 h-3 text-red-500" />
+                            )}
+                            
+                            {/* Planned Revision Hours */}
+                            {editingCell?.chapterId === chapter.id && editingCell.type === 'revision' ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  value={tempHours}
+                                  onChange={(e) => setTempHours(parseFloat(e.target.value))}
+                                  className="w-12 px-1 border rounded text-sm"
+                                  step="0.5"
+                                  min="0"
+                                  autoFocus
+                                />
+                                <button onClick={() => handleSaveHours(chapter)}>
+                                  <Save className="w-3 h-3 text-green-500" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleEditHours(chapter.id, 'revision', chapter.revisionHours || 1)}
+                                className="text-green-600 hover:bg-green-50 px-1 rounded text-sm"
+                                title="Planned revision hours"
+                              >
+                                R:{chapter.revisionHours || 1}h
                               </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => handleEditHours(chapter.id, 'study', chapter.studyHours || 2)}
-                              className="text-blue-600 hover:bg-blue-50 px-2 py-1 rounded flex items-center gap-1 mx-auto"
-                            >
-                              {chapter.studyHours || 2}h
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                          )}
+                            )}
+                          </div>
                         </td>
-                        <td className="border p-2 text-center">
-                          {editingCell?.chapterId === chapter.id && editingCell.type === 'revision' ? (
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                value={tempHours}
-                                onChange={(e) => setTempHours(parseFloat(e.target.value))}
-                                className="w-12 px-1 border rounded"
-                                step="0.5"
-                                min="0.5"
-                              />
-                              <button onClick={() => handleSaveHours(chapter)}>
-                                <Save className="w-3 h-3 text-green-500" />
+                        <td className="border p-2">
+                          <div className="flex gap-2 justify-center">
+                            {/* Actual Study Hours */}
+                            {editingCell?.chapterId === chapter.id && editingCell.type === 'actual-study' ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  value={tempHours}
+                                  onChange={(e) => setTempHours(parseFloat(e.target.value))}
+                                  className="w-12 px-1 border rounded text-sm"
+                                  step="0.25"
+                                  min="0"
+                                  autoFocus
+                                />
+                                <button onClick={() => handleSaveHours(chapter)}>
+                                  <Save className="w-3 h-3 text-green-500" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleEditHours(chapter.id, 'actual-study', chapter.actualStudyHours || 0)}
+                                className={`px-1 rounded text-sm ${
+                                  chapter.actualStudyHours 
+                                    ? chapter.actualStudyHours > (chapter.studyHours || 2)
+                                      ? 'text-red-600 hover:bg-red-50' 
+                                      : chapter.actualStudyHours < (chapter.studyHours || 2)
+                                      ? 'text-green-600 hover:bg-green-50'
+                                      : 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-gray-400 hover:bg-gray-50'
+                                }`}
+                                title="Actual study hours"
+                              >
+                                S:{chapter.actualStudyHours || 0}h
                               </button>
-                              <button onClick={() => setEditingCell(null)}>
-                                <X className="w-3 h-3 text-red-500" />
+                            )}
+                            
+                            {/* Actual Revision Hours */}
+                            {editingCell?.chapterId === chapter.id && editingCell.type === 'actual-revision' ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  value={tempHours}
+                                  onChange={(e) => setTempHours(parseFloat(e.target.value))}
+                                  className="w-12 px-1 border rounded text-sm"
+                                  step="0.25"
+                                  min="0"
+                                  autoFocus
+                                />
+                                <button onClick={() => handleSaveHours(chapter)}>
+                                  <Save className="w-3 h-3 text-green-500" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleEditHours(chapter.id, 'actual-revision', chapter.actualRevisionHours || 0)}
+                                className={`px-1 rounded text-sm ${
+                                  chapter.actualRevisionHours 
+                                    ? chapter.actualRevisionHours > (chapter.revisionHours || 1)
+                                      ? 'text-red-600 hover:bg-red-50'
+                                      : chapter.actualRevisionHours < (chapter.revisionHours || 1)
+                                      ? 'text-green-600 hover:bg-green-50'
+                                      : 'text-blue-600 hover:bg-blue-50'
+                                    : 'text-gray-400 hover:bg-gray-50'
+                                }`}
+                                title="Actual revision hours"
+                              >
+                                R:{chapter.actualRevisionHours || 0}h
                               </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => handleEditHours(chapter.id, 'revision', chapter.revisionHours || 1)}
-                              className="text-green-600 hover:bg-green-50 px-2 py-1 rounded flex items-center gap-1 mx-auto"
-                            >
-                              {chapter.revisionHours || 1}h
-                              <Edit2 className="w-3 h-3" />
-                            </button>
-                          )}
+                            )}
+                          </div>
                         </td>
                         <td className="border p-2">
                           <div className="flex items-center gap-2">
