@@ -668,6 +668,7 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
                   assignments={chapterAssignments}
                   chapters={chapters}
                   activeSession={activeSession}
+                  activitySessions={activitySessions}
                   onStartActivity={(assignmentId) => onStartActivity?.(assignmentId)}
                   onPauseActivity={(sessionId) => onPauseActivity?.(sessionId)}
                   onResumeActivity={(sessionId) => onResumeActivity?.(sessionId)}

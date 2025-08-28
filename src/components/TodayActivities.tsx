@@ -19,6 +19,7 @@ interface TodayActivitiesProps {
   assignments: ChapterAssignment[];
   chapters: Chapter[];
   activeSession?: ActivitySession;
+  activitySessions?: ActivitySession[];
   onStartActivity: (assignmentId: string) => void;
   onPauseActivity: (sessionId: string) => void;
   onResumeActivity: (sessionId: string) => void;
@@ -31,6 +32,7 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
   assignments,
   chapters,
   activeSession,
+  activitySessions = [],
   onStartActivity,
   onPauseActivity,
   onResumeActivity,
@@ -46,9 +48,6 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayAssignments = getAssignmentsForDate(todayStr);
   
-  console.log('TodayActivities - Date:', todayStr);
-  console.log('TodayActivities - Assignments:', todayAssignments);
-  console.log('TodayActivities - Active Session:', activeSession);
 
   // Update current time every minute
   useEffect(() => {
@@ -125,7 +124,12 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
     if (activeSession?.assignmentId === assignment.id) {
       return activeSession.isActive ? 'running' : 'paused';
     }
-    return assignment.status;
+    // Check if assignment has a status already (might be in-progress or paused)
+    if (assignment.status === 'in-progress') {
+      // If there's no active session but assignment shows in-progress, it's paused
+      return 'paused';
+    }
+    return assignment.status || 'scheduled';
   };
 
   const getStatusColor = (status: string) => {
@@ -145,39 +149,37 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
   };
 
   const handleStart = (assignmentId: string) => {
-    console.log('Starting activity:', assignmentId);
     if (onStartActivity) {
       onStartActivity(assignmentId);
-    } else {
-      console.error('onStartActivity handler not provided');
     }
   };
 
   const handlePause = () => {
-    console.log('Pausing activity:', activeSession?.sessionId);
     if (activeSession && onPauseActivity) {
       onPauseActivity(activeSession.sessionId);
-    } else {
-      console.error('Cannot pause: ', { activeSession, onPauseActivity: !!onPauseActivity });
     }
   };
 
   const handleResume = () => {
-    console.log('Resuming activity:', activeSession?.sessionId);
     if (activeSession && onResumeActivity) {
       onResumeActivity(activeSession.sessionId);
-    } else {
-      console.error('Cannot resume: ', { activeSession, onResumeActivity: !!onResumeActivity });
     }
   };
 
   const handleComplete = (assignmentId: string) => {
-    if (activeSession && activeSession.assignmentId === assignmentId) {
-      const elapsedMinutes = Math.floor((elapsedTimes.get(assignmentId) || 0) / 60);
-      const confirmMessage = `Are you sure you want to complete this task?\n\nTime spent: ${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`;
-      
-      if (window.confirm(confirmMessage)) {
-        onCompleteActivity(activeSession.sessionId, elapsedMinutes);
+    // Find the session for this assignment
+    let session = activeSession;
+    if (!session || session.assignmentId !== assignmentId) {
+      // Try to find the session in activitySessions
+      session = activitySessions.find(s => s.assignmentId === assignmentId && !s.endTime);
+    }
+    
+    const elapsedMinutes = Math.floor((elapsedTimes.get(assignmentId) || 0) / 60);
+    const confirmMessage = `Are you sure you want to complete this task?\n\nTime spent: ${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`;
+    
+    if (window.confirm(confirmMessage)) {
+      if (session) {
+        onCompleteActivity(session.sessionId, elapsedMinutes);
       }
     }
   };
@@ -221,8 +223,6 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
           const elapsedSeconds = elapsedTimes.get(assignment.id) || 0;
           const plannedMinutes = assignment.plannedMinutes;
           const progress = (elapsedSeconds / 60 / plannedMinutes) * 100;
-          
-          console.log('Assignment:', assignment.id, 'Status:', status, 'IsActive:', isActive);
 
           return (
             <div
@@ -300,7 +300,7 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                {(status === 'scheduled' || (!isActive && status !== 'completed')) && (
+                {status !== 'running' && status !== 'paused' && status !== 'completed' && (
                   <button
                     onClick={() => handleStart(assignment.id)}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"

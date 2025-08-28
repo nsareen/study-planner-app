@@ -1327,9 +1327,14 @@ export const useStore = create<Store>()(
         const state = get();
         if (!state.currentUserId) return undefined;
         
-        // Find the most recent active session
+        // Find the current session (active or paused, but not completed)
         const sessions = state.activitySessions || [];
-        return sessions.find(s => s.isActive);
+        // First try to find an active session
+        const activeSession = sessions.find(s => s.isActive);
+        if (activeSession) return activeSession;
+        
+        // If no active session, find a paused session (has no endTime)
+        return sessions.find(s => !s.endTime && !s.isActive);
       },
       
       // Timer actions
