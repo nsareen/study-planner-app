@@ -59,10 +59,8 @@ const TodayPlan: React.FC = () => {
       const totalPausedMs = activeSession.pausedIntervals.reduce((total, interval) => {
         if (interval.resumedAt) {
           return total + (new Date(interval.resumedAt).getTime() - new Date(interval.pausedAt).getTime());
-        } else if (!activeSession.isActive) {
-          // Currently paused - don't count this pause period yet
-          return total;
         }
+        // Don't count current pause if it's ongoing
         return total;
       }, 0);
       
@@ -73,14 +71,20 @@ const TodayPlan: React.FC = () => {
       } else {
         // Paused - calculate up to when it was paused
         const lastPausedAt = activeSession.pausedIntervals[activeSession.pausedIntervals.length - 1]?.pausedAt;
-        const pausedTime = lastPausedAt ? new Date(lastPausedAt).getTime() : Date.now();
-        activeTime = pausedTime - new Date(activeSession.startTime).getTime() - totalPausedMs;
+        if (lastPausedAt) {
+          // Calculate time up to the pause moment
+          const pausedTime = new Date(lastPausedAt).getTime();
+          activeTime = pausedTime - new Date(activeSession.startTime).getTime() - totalPausedMs;
+        } else {
+          // No pause info, use current accumulated time
+          activeTime = Date.now() - new Date(activeSession.startTime).getTime() - totalPausedMs;
+        }
       }
       
       return Math.floor(activeTime / 1000);
     };
     
-    // Set initial time
+    // Set initial time immediately
     const elapsed = calculateElapsedTime();
     setTimer(prev => ({ ...prev, [activeSession.assignmentId]: elapsed }));
     
@@ -107,6 +111,11 @@ const TodayPlan: React.FC = () => {
   };
   
   const handleStartActivity = (assignmentId: string) => {
+    // Don't start if there's already an active session
+    if (activeSession) {
+      alert('Please complete or pause the current activity before starting a new one.');
+      return;
+    }
     startActivity(assignmentId);
     setTimer(prev => ({ ...prev, [assignmentId]: 0 }));
   };

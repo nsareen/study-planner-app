@@ -39,6 +39,7 @@ interface MatrixPlannerViewProps {
   onResumeActivity?: (sessionId: string) => void;
   onCompleteActivity?: (sessionId: string, actualMinutes: number) => void;
   onDeleteAssignment?: (assignmentId: string) => void;
+  onUpdateAssignment?: (assignmentId: string, updates: Partial<ChapterAssignment>) => void;
   selectedExamDate?: Date | null;
   selectedChapterIds?: string[];
   onToggleChapterSelection?: (chapterId: string) => void;
@@ -67,6 +68,7 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
   onResumeActivity,
   onCompleteActivity,
   onDeleteAssignment,
+  onUpdateAssignment,
   selectedExamDate,
   selectedChapterIds = [],
   onToggleChapterSelection,
@@ -451,7 +453,8 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
                                     />
                                   </div>
                                   <span className="text-xs text-gray-600">
-                                    {stats.studyCompleted === stats.totalChapters ? '✓ Complete' : 
+                                    {stats.studyCompleted === stats.totalChapters && stats.totalChapters > 0 ? '✓ Complete' : 
+                                     subjectChapters.some(c => c.studyStatus === 'in-progress') ? '🔄 In Progress' :
                                      stats.studyCompleted > 0 ? `${Math.round((stats.studyCompleted / stats.totalChapters) * 100)}%` : 
                                      'Not Started'}
                                   </span>
@@ -466,7 +469,8 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
                                     />
                                   </div>
                                   <span className="text-xs text-gray-600">
-                                    {stats.revisionCompleted === stats.totalChapters ? '✓ Complete' : 
+                                    {stats.revisionCompleted === stats.totalChapters && stats.totalChapters > 0 ? '✓ Complete' : 
+                                     subjectChapters.some(c => c.revisionStatus === 'in-progress') ? '🔄 In Progress' :
                                      stats.revisionCompleted > 0 ? `${Math.round((stats.revisionCompleted / stats.totalChapters) * 100)}%` : 
                                      'Not Started'}
                                   </span>
@@ -701,9 +705,9 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
                     onDateSelect={(date, type) => {
                       console.log('Date selected:', date, type);
                     }}
-                    onChapterStatusUpdate={(chapterId, status) => {
-                      onUpdateChapterStatus?.(chapterId, { status: status as any });
-                    }}
+                    onAssignmentUpdate={onUpdateAssignment}
+                    onAssignmentDelete={onDeleteAssignment}
+                    onAssignmentStart={onStartActivity}
                   />
                 </div>
               </div>

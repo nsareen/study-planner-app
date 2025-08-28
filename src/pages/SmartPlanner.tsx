@@ -18,7 +18,7 @@ const SmartPlanner: React.FC = () => {
     addExam, addChapter, updateChapter, deleteChapter, 
     addStudyPlan, updateStudyPlan, deleteStudyPlan, setActiveStudyPlan, duplicateStudyPlan,
     addPlannerDay, getPlannerDayByDate,
-    scheduleChapter, getAssignmentsForDate, deleteAssignment,
+    scheduleChapter, getAssignmentsForDate, deleteAssignment, updateAssignment,
     startActivity, pauseActivity, resumeActivity, completeActivity, getActiveSession
   } = useStore();
   
@@ -348,6 +348,7 @@ const SmartPlanner: React.FC = () => {
               onResumeActivity={resumeActivity}
               onCompleteActivity={completeActivity}
               onDeleteAssignment={deleteAssignment}
+              onUpdateAssignment={updateAssignment}
               selectedExamDate={selectedExam && exams.find(e => e.id === selectedExam) ? new Date(exams.find(e => e.id === selectedExam)!.date) : null}
               selectedChapterIds={[]}
               onToggleChapterSelection={() => {}}

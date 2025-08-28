@@ -8,7 +8,10 @@ import {
   Circle,
   AlertCircle,
   Plus,
-  BookOpen
+  BookOpen,
+  Trash2,
+  Play,
+  Pause
 } from 'lucide-react';
 import type { Chapter, Exam, ChapterAssignment } from '../../types';
 
@@ -24,7 +27,10 @@ interface CalendarDayCellProps {
   viewMode: 'daily' | 'weekly' | 'monthly';
   onDateSelect: (date: Date, type: 'study' | 'revision') => void;
   onHover: (cell: { date: string; chapter?: Chapter } | null) => void;
-  onChapterStatusUpdate: (chapterId: string, status: string) => void;
+  onAssignmentUpdate?: (assignmentId: string, updates: Partial<ChapterAssignment>) => void;
+  onAssignmentDelete?: (assignmentId: string) => void;
+  onAssignmentStart?: (assignmentId: string) => void;
+  onAssignmentClick?: (assignment: ChapterAssignment) => void;
 }
 
 const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
@@ -39,7 +45,10 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   viewMode,
   onDateSelect,
   onHover,
-  onChapterStatusUpdate,
+  onAssignmentUpdate,
+  onAssignmentDelete,
+  onAssignmentStart,
+  onAssignmentClick,
 }) => {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
 
@@ -151,14 +160,13 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
         {viewMode !== 'monthly' && studyTasks.map((task, idx) => (
           <div
             key={`study-${idx}`}
-            className="flex items-center gap-1 bg-blue-100 rounded px-1 py-0.5 text-xs cursor-pointer hover:bg-blue-200"
-            onClick={() => onChapterStatusUpdate(task.chapterId, task.status)}
+            className="flex items-center gap-1 bg-blue-100 rounded px-1 py-0.5 text-xs hover:bg-blue-200 group"
             onMouseEnter={() => onHover({ date: dateStr, chapter: task.chapter })}
             onMouseLeave={() => onHover(null)}
           >
             {getStatusIcon(task.status)}
             <Book className="w-3 h-3 text-blue-600" />
-            <span className="truncate text-blue-700">
+            <span className="truncate text-blue-700 flex-1">
               {task.chapterName || task.subject}
             </span>
           </div>
@@ -168,21 +176,42 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
         {viewMode !== 'monthly' && studyAssignments.map((assignment, idx) => (
           <div
             key={`study-assign-${idx}`}
-            className="flex items-center gap-1 bg-blue-50 border border-blue-300 rounded px-2 py-1 text-xs hover:bg-blue-100 transition-colors"
+            className="flex items-center gap-1 bg-blue-50 border border-blue-300 rounded px-2 py-1 text-xs hover:bg-blue-100 hover:shadow-md transition-all group cursor-pointer"
+            title="Click to view/manage this activity"
             onMouseEnter={() => assignment.chapter && onHover({ date: dateStr, chapter: assignment.chapter })}
             onMouseLeave={() => onHover(null)}
+            onClick={() => {
+              if (onAssignmentClick) {
+                onAssignmentClick(assignment);
+              } else if (assignment.status === 'scheduled' && onAssignmentStart) {
+                onAssignmentStart(assignment.id);
+              }
+            }}
           >
             {getStatusIcon(assignment.status)}
             <BookOpen className="w-3 h-3 text-blue-600" />
             <span className="font-medium text-blue-800">
               {assignment.chapter?.subject}:
             </span>
-            <span className="truncate text-blue-700">
+            <span className="truncate text-blue-700 flex-1">
               {assignment.chapter?.name}
             </span>
-            <span className="text-blue-500 text-[10px] ml-auto">
+            <span className="text-blue-500 text-[10px]">
               {Math.round(assignment.plannedMinutes / 60)}h
             </span>
+            {onAssignmentDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm('Remove this scheduled activity?')) {
+                    onAssignmentDelete(assignment.id);
+                  }
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-red-100 rounded"
+              >
+                <Trash2 className="w-3 h-3 text-red-500" />
+              </button>
+            )}
           </div>
         ))}
 
@@ -190,14 +219,13 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
         {viewMode !== 'monthly' && revisionTasks.map((task, idx) => (
           <div
             key={`revision-${idx}`}
-            className="flex items-center gap-1 bg-green-100 rounded px-1 py-0.5 text-xs cursor-pointer hover:bg-green-200"
-            onClick={() => onChapterStatusUpdate(task.chapterId, task.status)}
+            className="flex items-center gap-1 bg-green-100 rounded px-1 py-0.5 text-xs hover:bg-green-200 group"
             onMouseEnter={() => onHover({ date: dateStr, chapter: task.chapter })}
             onMouseLeave={() => onHover(null)}
           >
             {getStatusIcon(task.status)}
             <RefreshCw className="w-3 h-3 text-green-600" />
-            <span className="truncate text-green-700">
+            <span className="truncate text-green-700 flex-1">
               {task.chapterName || task.subject}
             </span>
           </div>
@@ -207,21 +235,42 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
         {viewMode !== 'monthly' && revisionAssignments.map((assignment, idx) => (
           <div
             key={`revision-assign-${idx}`}
-            className="flex items-center gap-1 bg-green-50 border border-green-300 rounded px-2 py-1 text-xs hover:bg-green-100 transition-colors"
+            className="flex items-center gap-1 bg-green-50 border border-green-300 rounded px-2 py-1 text-xs hover:bg-green-100 hover:shadow-md transition-all group cursor-pointer"
+            title="Click to view/manage this activity"
             onMouseEnter={() => assignment.chapter && onHover({ date: dateStr, chapter: assignment.chapter })}
             onMouseLeave={() => onHover(null)}
+            onClick={() => {
+              if (onAssignmentClick) {
+                onAssignmentClick(assignment);
+              } else if (assignment.status === 'scheduled' && onAssignmentStart) {
+                onAssignmentStart(assignment.id);
+              }
+            }}
           >
             {getStatusIcon(assignment.status)}
             <RefreshCw className="w-3 h-3 text-green-600" />
             <span className="font-medium text-green-800">
               {assignment.chapter?.subject}:
             </span>
-            <span className="truncate text-green-700">
+            <span className="truncate text-green-700 flex-1">
               {assignment.chapter?.name}
             </span>
-            <span className="text-green-500 text-[10px] ml-auto">
+            <span className="text-green-500 text-[10px]">
               {Math.round(assignment.plannedMinutes / 60)}h
             </span>
+            {onAssignmentDelete && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm('Remove this scheduled activity?')) {
+                    onAssignmentDelete(assignment.id);
+                  }
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-red-100 rounded"
+              >
+                <Trash2 className="w-3 h-3 text-red-500" />
+              </button>
+            )}
           </div>
         ))}
 
