@@ -45,6 +45,10 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
   // Get today's assignments
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const todayAssignments = getAssignmentsForDate(todayStr);
+  
+  console.log('TodayActivities - Date:', todayStr);
+  console.log('TodayActivities - Assignments:', todayAssignments);
+  console.log('TodayActivities - Active Session:', activeSession);
 
   // Update current time every minute
   useEffect(() => {
@@ -141,18 +145,29 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
   };
 
   const handleStart = (assignmentId: string) => {
-    onStartActivity(assignmentId);
+    console.log('Starting activity:', assignmentId);
+    if (onStartActivity) {
+      onStartActivity(assignmentId);
+    } else {
+      console.error('onStartActivity handler not provided');
+    }
   };
 
   const handlePause = () => {
-    if (activeSession) {
+    console.log('Pausing activity:', activeSession?.sessionId);
+    if (activeSession && onPauseActivity) {
       onPauseActivity(activeSession.sessionId);
+    } else {
+      console.error('Cannot pause: ', { activeSession, onPauseActivity: !!onPauseActivity });
     }
   };
 
   const handleResume = () => {
-    if (activeSession) {
+    console.log('Resuming activity:', activeSession?.sessionId);
+    if (activeSession && onResumeActivity) {
       onResumeActivity(activeSession.sessionId);
+    } else {
+      console.error('Cannot resume: ', { activeSession, onResumeActivity: !!onResumeActivity });
     }
   };
 
@@ -206,6 +221,8 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
           const elapsedSeconds = elapsedTimes.get(assignment.id) || 0;
           const plannedMinutes = assignment.plannedMinutes;
           const progress = (elapsedSeconds / 60 / plannedMinutes) * 100;
+          
+          console.log('Assignment:', assignment.id, 'Status:', status, 'IsActive:', isActive);
 
           return (
             <div
@@ -283,7 +300,7 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                {status === 'scheduled' && (
+                {(status === 'scheduled' || (!isActive && status !== 'completed')) && (
                   <button
                     onClick={() => handleStart(assignment.id)}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
