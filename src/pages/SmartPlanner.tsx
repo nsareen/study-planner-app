@@ -20,16 +20,17 @@ import MetricsComparison from '../components/MetricsComparison';
 const SmartPlanner: React.FC = () => {
   const [searchParams] = useSearchParams();
   const { 
-    chapters, exams, examGroups, offDays, studyPlans, activeStudyPlanId,
+    chapters, exams, examGroups, offDays, studyPlans, activeStudyPlanId, plannerDays,
     addExam, addChapter, updateChapter, deleteChapter, 
-    addStudyPlan, updateStudyPlan, deleteStudyPlan, setActiveStudyPlan, duplicateStudyPlan
+    addStudyPlan, updateStudyPlan, deleteStudyPlan, setActiveStudyPlan, duplicateStudyPlan,
+    addPlannerDay, updatePlannerDay, deletePlannerDay, addTaskToPlannerDay, 
+    removeTaskFromPlannerDay, updatePlannerTask, getPlannerDayByDate
   } = useStore();
   
   // Get view from URL param if provided
   const viewParam = searchParams.get('view') as 'week' | 'month' | 'list' | 'matrix' | 'plans' | 'editor' | null;
   
   const [selectedExam, setSelectedExam] = useState<string>('');
-  const [plannerDays, setPlannerDays] = useState<PlannerDay[]>([]);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfDay(new Date()));
   const [draggedChapter, setDraggedChapter] = useState<Chapter | null>(null);
   const [draggedTaskType, setDraggedTaskType] = useState<'study' | 'revision'>('study');
@@ -87,9 +88,23 @@ const SmartPlanner: React.FC = () => {
       }
     }
     
-    const days = generatePlannerDays(today, endDate);
-    setPlannerDays(days);
-  }, [selectedExam, exams, offDays]);
+    // Only generate if we don't have planner days for this range
+    const existingDays = plannerDays.filter(day => {
+      const dayDate = new Date(day.date);
+      return dayDate >= today && dayDate <= endDate;
+    });
+    
+    if (existingDays.length === 0) {
+      const days = generatePlannerDays(today, endDate);
+      // Add each day to the store
+      days.forEach(day => {
+        const existing = getPlannerDayByDate(day.date);
+        if (!existing) {
+          addPlannerDay(day);
+        }
+      });
+    }
+  }, [selectedExam, exams, offDays, plannerDays, addPlannerDay, getPlannerDayByDate]);
 
   // Timer effect
   useEffect(() => {
@@ -192,31 +207,27 @@ const SmartPlanner: React.FC = () => {
       confidence: chapter.confidence || 'medium'
     };
     
-    const updatedDays = plannerDays.map(d => {
-      if (d.id === day.id) {
-        return {
-          ...d,
-          plannedTasks: [...d.plannedTasks, newTask]
-        };
-      }
-      return d;
-    });
+    // Add task to the planner day
+    const existingDay = plannerDays.find(d => d.id === day.id);
+    if (existingDay) {
+      addTaskToPlannerDay(existingDay.id, newTask);
+    } else {
+      // If day doesn't exist in store, create it first
+      const newDay: Omit<PlannerDay, 'id'> = {
+        date: day.date,
+        dayType: day.dayType,
+        availableHours: day.availableHours,
+        plannedTasks: [newTask],
+        actualTimeSpent: 0
+      };
+      addPlannerDay(newDay);
+    }
     
-    setPlannerDays(updatedDays);
     setDraggedChapter(null);
   };
 
   const removeTask = (dayId: string, taskId: string) => {
-    const updatedDays = plannerDays.map(d => {
-      if (d.id === dayId) {
-        return {
-          ...d,
-          plannedTasks: d.plannedTasks.filter(t => t.id !== taskId)
-        };
-      }
-      return d;
-    });
-    setPlannerDays(updatedDays);
+    removeTaskFromPlannerDay(dayId, taskId);
   };
 
   // Handler for updating chapter hours in Matrix view
@@ -285,13 +296,13 @@ const SmartPlanner: React.FC = () => {
     setIsTimerRunning(true);
     
     // Update task status
-    const updatedDays = plannerDays.map(day => ({
-      ...day,
-      plannedTasks: day.plannedTasks.map(t => 
-        t.id === task.id ? { ...t, status: 'in-progress' as const } : t
-      )
-    }));
-    setPlannerDays(updatedDays);
+    const dayWithTask = plannerDays.find(day => 
+      day.plannedTasks.some(t => t.id === task.id)
+    );
+    
+    if (dayWithTask) {
+      updatePlannerTask(dayWithTask.id, task.id, { status: 'in-progress' as const });
+    }
   };
 
   const pauseTask = () => {
@@ -301,15 +312,17 @@ const SmartPlanner: React.FC = () => {
   const completeTask = () => {
     if (!activeTask) return;
     
-    const updatedDays = plannerDays.map(day => ({
-      ...day,
-      plannedTasks: day.plannedTasks.map(t => 
-        t.id === activeTask.id 
-          ? { ...t, status: 'completed' as const, actualMinutes: Math.floor(elapsedTime / 60) }
-          : t
-      )
-    }));
-    setPlannerDays(updatedDays);
+    // Find the day containing the active task
+    const dayWithTask = plannerDays.find(day => 
+      day.plannedTasks.some(t => t.id === activeTask.id)
+    );
+    
+    if (dayWithTask) {
+      updatePlannerTask(dayWithTask.id, activeTask.id, { 
+        status: 'completed' as const, 
+        actualMinutes: Math.floor(elapsedTime / 60) 
+      });
+    }
     
     setActiveTask(null);
     setElapsedTime(0);
@@ -414,7 +427,13 @@ const SmartPlanner: React.FC = () => {
     const endDate = selectedExam ? exams.find(e => e.id === selectedExam)?.date : addDays(new Date(), 30).toISOString();
     if (endDate) {
       const newPlan = generatePlannerDays(new Date(), new Date(endDate));
-      setPlannerDays(newPlan);
+      // Clear existing planner days and add new ones
+      plannerDays.forEach(day => deletePlannerDay(day.id));
+      newPlan.forEach(day => {
+        const dayToAdd = { ...day };
+        delete (dayToAdd as any).id; // Remove id so store generates it
+        addPlannerDay(dayToAdd);
+      });
     }
   };
 
