@@ -15,6 +15,7 @@ import StudyPlanManager from '../components/StudyPlanManager';
 import EnhancedMatrixEditor from '../components/EnhancedMatrixEditor';
 import FlexibleCalendar from '../components/Calendar/FlexibleCalendar';
 import DailyProgress from '../components/DailyProgress';
+import MetricsComparison from '../components/MetricsComparison';
 
 const SmartPlanner: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -35,7 +36,7 @@ const SmartPlanner: React.FC = () => {
   const [activeTask, setActiveTask] = useState<PlannerTask | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [selectedView, setSelectedView] = useState<'week' | 'month' | 'list' | 'matrix' | 'plans' | 'editor' | 'progress'>(viewParam || 'plans');
+  const [selectedView, setSelectedView] = useState<'week' | 'month' | 'list' | 'matrix' | 'plans' | 'editor' | 'progress' | 'metrics'>(viewParam || 'plans');
   const [showTutorial, setShowTutorial] = useState(false);
   const [subjectDefaults] = useState<Map<string, { study: number; revision: number }>>(new Map());
   const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
@@ -525,6 +526,17 @@ const SmartPlanner: React.FC = () => {
                 Progress
               </button>
               <button
+                onClick={() => setSelectedView('metrics')}
+                className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                  selectedView === 'metrics' 
+                    ? 'bg-purple-500 text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <Zap size={18} />
+                Metrics
+              </button>
+              <button
                 onClick={() => setSelectedView('editor')}
                 className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
                   selectedView === 'editor' 
@@ -752,6 +764,10 @@ const SmartPlanner: React.FC = () => {
             chapters={chapters}
             plannerDays={plannerDays}
             currentDate={currentWeekStart}
+          />
+        ) : selectedView === 'metrics' ? (
+          <MetricsComparison
+            chapters={chapters}
           />
         ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AppState, Exam, ExamGroup, OffDay, Chapter, DailyLog, AppSettings, DailyTask, UserProfile, StudyPlan, ChapterStatus, SubjectConfig } from '../types';
+import type { AppState, Exam, ExamGroup, OffDay, Chapter, DailyLog, AppSettings, DailyTask, UserProfile, StudyPlan, ChapterStatus, SubjectConfig, PerformanceMetric, HistoricalPerformance } from '../types';
 
 interface StoreActions {
   // User actions
@@ -46,6 +46,11 @@ interface StoreActions {
   
   // Settings actions
   updateSettings: (settings: Partial<AppSettings>) => void;
+  
+  // Historical Performance actions
+  recordDailyPerformance: (metric: PerformanceMetric) => void;
+  getHistoricalPerformance: () => HistoricalPerformance | undefined;
+  updatePerformanceAverages: () => void;
   
   // Utility actions
   setCurrentDate: (date: string) => void;
@@ -782,6 +787,102 @@ export const useStore = create<Store>()(
             settings: updatedSettings,
           };
         }),
+      
+      // Historical Performance actions
+      recordDailyPerformance: (metric) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const currentPerformance = state.userData[state.currentUserId].historicalPerformance || {
+            id: generateId(),
+            userId: state.currentUserId,
+            metrics: [],
+            weeklyAverages: { efficiency: 0, studyHours: 0, revisionHours: 0, completionRate: 0 },
+            monthlyAverages: { efficiency: 0, studyHours: 0, revisionHours: 0, completionRate: 0 },
+            lastUpdated: new Date().toISOString(),
+          };
+          
+          // Add or update today's metric
+          const todayDate = metric.date;
+          const existingIndex = currentPerformance.metrics.findIndex(m => m.date === todayDate);
+          
+          if (existingIndex >= 0) {
+            currentPerformance.metrics[existingIndex] = metric;
+          } else {
+            currentPerformance.metrics.push(metric);
+            // Keep only last 90 days of data
+            if (currentPerformance.metrics.length > 90) {
+              currentPerformance.metrics = currentPerformance.metrics.slice(-90);
+            }
+          }
+          
+          currentPerformance.lastUpdated = new Date().toISOString();
+          
+          const updatedUserData = {
+            ...state.userData,
+            [state.currentUserId]: {
+              ...state.userData[state.currentUserId],
+              historicalPerformance: currentPerformance,
+            }
+          };
+          
+          return {
+            userData: updatedUserData,
+          };
+        }),
+      
+      getHistoricalPerformance: () => {
+        const state = get();
+        if (!state.currentUserId) return undefined;
+        return state.userData[state.currentUserId]?.historicalPerformance;
+      },
+      
+      updatePerformanceAverages: () => {
+        const state = get();
+        if (!state.currentUserId) return;
+        
+        const performance = state.userData[state.currentUserId]?.historicalPerformance;
+        if (!performance || performance.metrics.length === 0) return;
+        
+        // Calculate weekly averages (last 7 days)
+        const weekMetrics = performance.metrics.slice(-7);
+        const weeklyAverages = {
+          efficiency: weekMetrics.reduce((sum, m) => sum + m.efficiency, 0) / weekMetrics.length,
+          studyHours: weekMetrics.reduce((sum, m) => sum + m.actualStudyMinutes / 60, 0) / weekMetrics.length,
+          revisionHours: weekMetrics.reduce((sum, m) => sum + m.actualRevisionMinutes / 60, 0) / weekMetrics.length,
+          completionRate: weekMetrics.reduce((sum, m) => sum + (m.tasksTotal > 0 ? (m.tasksCompleted / m.tasksTotal) * 100 : 0), 0) / weekMetrics.length,
+        };
+        
+        // Calculate monthly averages (last 30 days)
+        const monthMetrics = performance.metrics.slice(-30);
+        const monthlyAverages = {
+          efficiency: monthMetrics.reduce((sum, m) => sum + m.efficiency, 0) / monthMetrics.length,
+          studyHours: monthMetrics.reduce((sum, m) => sum + m.actualStudyMinutes / 60, 0) / monthMetrics.length,
+          revisionHours: monthMetrics.reduce((sum, m) => sum + m.actualRevisionMinutes / 60, 0) / monthMetrics.length,
+          completionRate: monthMetrics.reduce((sum, m) => sum + (m.tasksTotal > 0 ? (m.tasksCompleted / m.tasksTotal) * 100 : 0), 0) / monthMetrics.length,
+        };
+        
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const updatedPerformance = {
+            ...performance,
+            weeklyAverages,
+            monthlyAverages,
+            lastUpdated: new Date().toISOString(),
+          };
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                historicalPerformance: updatedPerformance,
+              }
+            },
+          };
+        });
+      },
       
       // Utility actions
       setCurrentDate: (date) => set({ currentDate: date }),

@@ -10,6 +10,7 @@ import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import SubjectQuickActions from './SubjectQuickActions';
 import FlexibleCalendar from './Calendar/FlexibleCalendar';
 import TimerModal from './Timer/TimerModal';
+import DailyMetricsPanel from './DailyMetricsPanel';
 
 interface MatrixPlannerViewProps {
   chapters: Chapter[];
@@ -251,9 +252,19 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl p-4">
-      {/* Grid Layout: Side-by-side on desktop, stacked on mobile */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="space-y-6">
+      {/* Daily Metrics Panel - Compact View */}
+      <div className="lg:max-w-md">
+        <DailyMetricsPanel 
+          chapters={chapters}
+          plannerDays={plannerDays}
+          compact={true}
+        />
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-xl p-4">
+        {/* Grid Layout: Side-by-side on desktop, stacked on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Left Section: Chapter Matrix */}
         <div className="lg:col-span-1">
@@ -936,6 +947,7 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
         onComplete={handleTimerComplete}
         onUpdateChapterStatus={onUpdateChapterStatus}
       />
+      </div>
     </div>
   );
 };

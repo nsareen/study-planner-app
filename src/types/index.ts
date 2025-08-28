@@ -99,6 +99,39 @@ export interface DailyLog {
   createdAt: string;
 }
 
+export interface PerformanceMetric {
+  date: string;
+  plannedStudyMinutes: number;
+  plannedRevisionMinutes: number;
+  actualStudyMinutes: number;
+  actualRevisionMinutes: number;
+  tasksCompleted: number;
+  tasksTotal: number;
+  efficiency: number; // percentage
+  subjects: string[];
+  chaptersStudied: string[];
+  chaptersRevised: string[];
+}
+
+export interface HistoricalPerformance {
+  id: string;
+  userId: string;
+  metrics: PerformanceMetric[];
+  weeklyAverages: {
+    efficiency: number;
+    studyHours: number;
+    revisionHours: number;
+    completionRate: number;
+  };
+  monthlyAverages: {
+    efficiency: number;
+    studyHours: number;
+    revisionHours: number;
+    completionRate: number;
+  };
+  lastUpdated: string;
+}
+
 export interface Subject {
   name: string;
   totalChapters: number;
@@ -249,6 +282,7 @@ export interface AppState {
       studyPlans: StudyPlan[]; // Multiple study plans
       activeStudyPlanId?: string; // Currently active plan
       subjectConfigs?: SubjectConfig[]; // New
+      historicalPerformance?: HistoricalPerformance; // Historical performance tracking
     };
   };
   currentDate: string;
