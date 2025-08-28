@@ -732,7 +732,11 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
         <TimerModal
           isOpen={showTimer}
           onClose={() => setShowTimer(false)}
-          config={timerConfig}
+          chapter={timerConfig.chapter}
+          chapters={timerConfig.chapters}
+          task={timerConfig.task}
+          mode={timerConfig.mode}
+          sessionType={timerConfig.sessionType}
           onComplete={(actualMinutes) => {
             if (timerConfig.chapter && onUpdateChapterStatus) {
               const updates: Partial<Chapter> = {};
@@ -745,6 +749,7 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
             }
             setShowTimer(false);
           }}
+          onUpdateChapterStatus={onUpdateChapterStatus}
         />
       )}
       

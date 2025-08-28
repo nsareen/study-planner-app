@@ -83,7 +83,7 @@ const TodayActivities: React.FC<TodayActivitiesProps> = ({
       const totalPausedMs = activeSession.pausedIntervals
         .filter(interval => interval.resumedAt)
         .reduce((total, interval) => {
-          return total + (new Date(interval.resumedAt).getTime() - new Date(interval.pausedAt).getTime());
+          return total + (new Date(interval.resumedAt!).getTime() - new Date(interval.pausedAt).getTime());
         }, 0);
       
       const lastPausedAt = activeSession.pausedIntervals[activeSession.pausedIntervals.length - 1]?.pausedAt;

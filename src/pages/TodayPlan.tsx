@@ -216,7 +216,10 @@ const TodayPlan: React.FC = () => {
                     <div>
                       <p className="text-sm opacity-90 mb-1">Currently Working On</p>
                       <h3 className="text-2xl font-bold">
-                        {getChapterForAssignment(todaysAssignments.find(a => a.id === activeSession.assignmentId))?.name || 'Activity'}
+                        {(() => {
+                          const assignment = todaysAssignments.find(a => a.id === activeSession.assignmentId);
+                          return assignment ? getChapterForAssignment(assignment)?.name : 'Activity';
+                        })() || 'Activity'}
                       </h3>
                     </div>
                     <div className="text-4xl font-mono font-bold">
@@ -229,7 +232,7 @@ const TodayPlan: React.FC = () => {
               {/* Task Cards */}
               {todaysAssignments.map((assignment) => {
                 const chapter = getChapterForAssignment(assignment);
-                const priorityInfo = getPriorityLabel(assignment.priority || 0);
+                const priorityInfo = getPriorityLabel(0.5); // Default medium priority
                 const isActive = activeSession?.assignmentId === assignment.id;
                 const isPaused = isActive && !activeSession?.isActive;
                 const taskTimer = timer[assignment.id] || 0;
@@ -252,11 +255,12 @@ const TodayPlan: React.FC = () => {
                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
                               assignment.status === 'completed' ? 'bg-green-100 text-green-700' :
                               assignment.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                              assignment.status === 'paused' ? 'bg-yellow-100 text-yellow-700' :
                               'bg-gray-100 text-gray-700'
                             }`}>
                               {assignment.status === 'completed' ? 'COMPLETED' :
                                assignment.status === 'in-progress' ? 'IN PROGRESS' :
-                               assignment.status === 'skipped' ? 'SKIPPED' : 'PENDING'}
+                               assignment.status === 'paused' ? 'PAUSED' : 'PENDING'}
                             </span>
                           </div>
                           <p className="text-gray-700 font-medium">{chapter.name}</p>
