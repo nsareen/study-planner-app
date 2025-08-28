@@ -4,9 +4,11 @@ import { Plus, BookOpen, Clock, CheckCircle, Circle, Trash2, Edit, HelpCircle, L
 import { getSubjectStats } from '../utils/prioritization';
 import CurriculumImport from '../components/CurriculumImport';
 import SmartChapterSuggest from '../components/SmartChapterSuggest';
+import ConfirmDialog, { useConfirmDialog } from '../components/ConfirmDialog';
 
 const Subjects: React.FC = () => {
   const { chapters, addChapter, updateChapter, deleteChapter, clearAllChapters } = useStore();
+  const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCurriculumImport, setShowCurriculumImport] = useState(false);
   const [useSmartSuggest, setUseSmartSuggest] = useState(true);
@@ -95,11 +97,12 @@ const Subjects: React.FC = () => {
             </button>
             {chapters.length > 0 && (
               <button
-                onClick={() => {
-                  if (window.confirm('Clear all chapters for testing? This cannot be undone.')) {
-                    clearAllChapters();
-                  }
-                }}
+                onClick={() => showConfirm(
+                  'Clear All Chapters',
+                  'Are you sure you want to delete all chapters? This will remove all your study progress and cannot be undone.',
+                  clearAllChapters,
+                  'danger'
+                )}
                 className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-4 py-2 rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-semibold"
               >
                 <Trash2 size={16} />
@@ -320,7 +323,12 @@ const Subjects: React.FC = () => {
                             <Edit size={16} />
                           </button>
                           <button
-                            onClick={() => deleteChapter(chapter.id)}
+                            onClick={() => showConfirm(
+                              'Delete Chapter',
+                              `Are you sure you want to delete "${chapter.name}"? This action cannot be undone.`,
+                              () => deleteChapter(chapter.id),
+                              'danger'
+                            )}
                             className="p-1 text-gray-600 hover:text-red-600 transition-colors"
                           >
                             <Trash2 size={16} />
@@ -340,6 +348,16 @@ const Subjects: React.FC = () => {
           onClose={() => setShowCurriculumImport(false)}
         />
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.isOpen}
+        onClose={hideConfirm}
+        onConfirm={dialogState.onConfirm}
+        title={dialogState.title}
+        message={dialogState.message}
+        type={dialogState.type}
+      />
     </div>
   );
 };

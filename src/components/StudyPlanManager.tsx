@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays, parseISO, addDays } from 'date-fns';
 import type { StudyPlan, ExamGroup } from '../types';
+import ConfirmDialog, { useConfirmDialog } from './ConfirmDialog';
 
 interface StudyPlanManagerProps {
   plans: StudyPlan[];
@@ -31,6 +32,7 @@ const StudyPlanManager: React.FC<StudyPlanManagerProps> = ({
   onDuplicatePlan,
   onOpenPlan
 }) => {
+  const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'timeline'>('grid');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'completed' | 'archived'>('all');
@@ -386,9 +388,12 @@ const StudyPlanManager: React.FC<StudyPlanManagerProps> = ({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (window.confirm(`Delete plan "${plan.name}"?`)) {
-                            onDeletePlan(plan.id);
-                          }
+                          showConfirm(
+                            'Delete Study Plan',
+                            `Are you sure you want to delete "${plan.name}"? This action cannot be undone.`,
+                            () => onDeletePlan(plan.id),
+                            'danger'
+                          );
                         }}
                         className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
                       >
@@ -507,6 +512,16 @@ const StudyPlanManager: React.FC<StudyPlanManagerProps> = ({
           <li>• Archive old plans to keep your workspace clean</li>
         </ul>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.isOpen}
+        onClose={hideConfirm}
+        onConfirm={dialogState.onConfirm}
+        title={dialogState.title}
+        message={dialogState.message}
+        type={dialogState.type}
+      />
     </div>
   );
 };

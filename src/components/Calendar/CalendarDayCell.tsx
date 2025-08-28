@@ -7,13 +7,16 @@ import {
   CheckCircle2, 
   Circle,
   AlertCircle,
-  Plus
+  Plus,
+  BookOpen
 } from 'lucide-react';
-import type { Chapter, Exam } from '../../types';
+import type { Chapter, Exam, ChapterAssignment } from '../../types';
 
 interface CalendarDayCellProps {
   date: Date;
   tasks: any[];
+  assignments?: ChapterAssignment[];
+  chapters?: Chapter[];
   exams: Exam[];
   isToday: boolean;
   isCurrentMonth: boolean;
@@ -27,6 +30,8 @@ interface CalendarDayCellProps {
 const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   date,
   tasks,
+  assignments = [],
+  chapters = [],
   exams,
   isToday,
   isCurrentMonth,
@@ -44,6 +49,20 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   // Group tasks by type
   const studyTasks = tasks.filter(t => t.taskType === 'study');
   const revisionTasks = tasks.filter(t => t.taskType === 'revision');
+  
+  // Group assignments by type and enhance with chapter info
+  const studyAssignments = assignments
+    .filter(a => a.activityType === 'study')
+    .map(a => ({
+      ...a,
+      chapter: chapters.find(c => c.id === a.chapterId)
+    }));
+  const revisionAssignments = assignments
+    .filter(a => a.activityType === 'revision')
+    .map(a => ({
+      ...a,
+      chapter: chapters.find(c => c.id === a.chapterId)
+    }));
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -145,6 +164,28 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
           </div>
         ))}
 
+        {/* Study Assignments - New scheduled chapters */}
+        {viewMode !== 'monthly' && studyAssignments.map((assignment, idx) => (
+          <div
+            key={`study-assign-${idx}`}
+            className="flex items-center gap-1 bg-blue-50 border border-blue-300 rounded px-2 py-1 text-xs hover:bg-blue-100 transition-colors"
+            onMouseEnter={() => assignment.chapter && onHover({ date: dateStr, chapter: assignment.chapter })}
+            onMouseLeave={() => onHover(null)}
+          >
+            {getStatusIcon(assignment.status)}
+            <BookOpen className="w-3 h-3 text-blue-600" />
+            <span className="font-medium text-blue-800">
+              {assignment.chapter?.subject}:
+            </span>
+            <span className="truncate text-blue-700">
+              {assignment.chapter?.name}
+            </span>
+            <span className="text-blue-500 text-[10px] ml-auto">
+              {Math.round(assignment.plannedMinutes / 60)}h
+            </span>
+          </div>
+        ))}
+
         {/* Revision Tasks */}
         {viewMode !== 'monthly' && revisionTasks.map((task, idx) => (
           <div
@@ -162,26 +203,48 @@ const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
           </div>
         ))}
 
+        {/* Revision Assignments - New scheduled chapters */}
+        {viewMode !== 'monthly' && revisionAssignments.map((assignment, idx) => (
+          <div
+            key={`revision-assign-${idx}`}
+            className="flex items-center gap-1 bg-green-50 border border-green-300 rounded px-2 py-1 text-xs hover:bg-green-100 transition-colors"
+            onMouseEnter={() => assignment.chapter && onHover({ date: dateStr, chapter: assignment.chapter })}
+            onMouseLeave={() => onHover(null)}
+          >
+            {getStatusIcon(assignment.status)}
+            <RefreshCw className="w-3 h-3 text-green-600" />
+            <span className="font-medium text-green-800">
+              {assignment.chapter?.subject}:
+            </span>
+            <span className="truncate text-green-700">
+              {assignment.chapter?.name}
+            </span>
+            <span className="text-green-500 text-[10px] ml-auto">
+              {Math.round(assignment.plannedMinutes / 60)}h
+            </span>
+          </div>
+        ))}
+
         {/* Summary for monthly view */}
-        {viewMode === 'monthly' && tasks.length > 0 && (
-          <div className="text-xs">
-            {studyTasks.length > 0 && (
+        {viewMode === 'monthly' && (tasks.length > 0 || assignments.length > 0) && (
+          <div className="text-xs space-y-1">
+            {(studyTasks.length > 0 || studyAssignments.length > 0) && (
               <div className="flex items-center gap-1 text-blue-600">
-                <Book className="w-3 h-3" />
-                <span>{studyTasks.length}</span>
+                <BookOpen className="w-3 h-3" />
+                <span>{studyTasks.length + studyAssignments.length}</span>
               </div>
             )}
-            {revisionTasks.length > 0 && (
+            {(revisionTasks.length > 0 || revisionAssignments.length > 0) && (
               <div className="flex items-center gap-1 text-green-600">
                 <RefreshCw className="w-3 h-3" />
-                <span>{revisionTasks.length}</span>
+                <span>{revisionTasks.length + revisionAssignments.length}</span>
               </div>
             )}
           </div>
         )}
 
         {/* Empty State for viewMode !== 'monthly' */}
-        {viewMode !== 'monthly' && tasks.length === 0 && exams.length === 0 && isCurrentMonth && (
+        {viewMode !== 'monthly' && tasks.length === 0 && assignments.length === 0 && exams.length === 0 && isCurrentMonth && (
           <div className="text-xs text-gray-400 text-center pt-2">
             No tasks
           </div>

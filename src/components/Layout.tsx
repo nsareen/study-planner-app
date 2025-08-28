@@ -4,6 +4,7 @@ import { Home, BookOpen, Calendar, TrendingUp, Settings, Sparkles, Target, Troph
 import { useStore } from '../store/useStore';
 import { getTheme } from '../utils/themes';
 import Tutorial from './Tutorial';
+import SyncIndicator from './SyncIndicator';
 
 const Layout: React.FC = () => {
   const { getCurrentUser, logoutUser, settings } = useStore();
@@ -17,13 +18,12 @@ const Layout: React.FC = () => {
   }, [settings.colorTheme]);
   
   const navItems = [
-    { to: '/', icon: Home, label: 'Dashboard', emoji: '🏠' },
-    { to: '/planner', icon: Brain, label: 'Smart Plan', emoji: '🧠', highlight: true },
-    { to: '/calendar', icon: Calendar, label: 'Exams', emoji: '📅' },
+    { to: '/today', icon: Target, label: 'Today', emoji: '🎯', highlight: true },
     { to: '/subjects', icon: BookOpen, label: 'Chapters', emoji: '📚' },
-    { to: '/progress', icon: TrendingUp, label: 'Progress', emoji: '📈' },
-    { to: '/collaboration', icon: Users, label: 'Collab', emoji: '👥' },
-    { to: '/today', icon: Target, label: 'Today', emoji: '🎯' },
+    { to: '/calendar', icon: Calendar, label: 'Exams', emoji: '📅' },
+    { to: '/planner', icon: Brain, label: 'Plan', emoji: '📝' },
+    { to: '/progress', icon: Trophy, label: 'Progress', emoji: '🏆' },
+    { to: '/collaboration', icon: Users, label: 'Friends', emoji: '👥' },
     { to: '/settings', icon: Settings, label: 'Settings', emoji: '⚙️' },
   ];
 
@@ -127,6 +127,9 @@ const Layout: React.FC = () => {
           isOpen={showTutorial} 
           onClose={() => setShowTutorial(false)}
         />
+        
+        {/* Data Sync Indicator */}
+        <SyncIndicator />
       </div>
     </div>
   );

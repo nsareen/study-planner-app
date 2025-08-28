@@ -4,6 +4,7 @@ import { Plus, Calendar as CalendarIcon, Trash2, X, Users, Play, Copy, Archive, 
 import { format, parseISO, differenceInDays } from 'date-fns';
 import type { ExamType, ExamGroup } from '../types';
 import ExamGroupForm from '../components/ExamGroupForm';
+import ConfirmDialog, { useConfirmDialog } from '../components/ConfirmDialog';
 
 const Calendar: React.FC = () => {
   const { 
@@ -11,6 +12,7 @@ const Calendar: React.FC = () => {
     addExam, deleteExam, addExamGroup, updateExamGroup, deleteExamGroup, applyExamGroup,
     addOffDay, deleteOffDay, currentDate 
   } = useStore();
+  const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
   const [showExamForm, setShowExamForm] = useState(false);
   const [showExamGroupForm, setShowExamGroupForm] = useState(false);
   const [showOffDayForm, setShowOffDayForm] = useState(false);
@@ -383,11 +385,12 @@ const Calendar: React.FC = () => {
                           <Copy size={16} />
                         </button>
                         <button
-                          onClick={() => {
-                            if (window.confirm(`Delete exam group "${group.name}"?`)) {
-                              deleteExamGroup(group.id);
-                            }
-                          }}
+                          onClick={() => showConfirm(
+                            'Delete Exam Group',
+                            `Are you sure you want to delete "${group.name}"? This will remove all scheduled exams and cannot be undone.`,
+                            () => deleteExamGroup(group.id),
+                            'danger'
+                          )}
                           className="p-1.5 text-red-500 hover:bg-red-100 rounded transition-colors"
                           title="Delete group"
                         >
@@ -571,6 +574,16 @@ const Calendar: React.FC = () => {
           mode={formMode}
         />
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.isOpen}
+        onClose={hideConfirm}
+        onConfirm={dialogState.onConfirm}
+        title={dialogState.title}
+        message={dialogState.message}
+        type={dialogState.type}
+      />
     </div>
   );
 };

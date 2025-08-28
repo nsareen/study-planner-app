@@ -1,7 +1,44 @@
 # Business Specifications - Smart Study Planner
+**Version**: 3.0  
+**Last Updated**: August 28, 2025 1:30 AM  
+**Status**: Active Development - Phase 8 (Critical UX Overhaul)
 
 ## Executive Summary
 A comprehensive, intelligent study planning application designed for 9th grade students to manage their exam preparation, track progress, and collaborate with peers. The system provides automated planning, visual tracking, and gamification elements to enhance student engagement and academic performance.
+
+## Timeline of Requirements Evolution
+
+### August 26, 2025 - Initial Development
+- Basic study planner with drag-and-drop interface
+- Simple calendar integration
+- Matrix view for chapters
+- Local storage implementation
+
+### August 27, 2025 - Critical Issues Identified (v2.0)
+- **11:00 PM**: User testing revealed major issues
+  - Data import/export failures
+  - No progress tracking capability
+  - Calendar UX problems
+  - Timer not integrated
+  - No velocity metrics
+- **11:35 PM**: Phase 1-3 implementation began
+  - Fixed data persistence
+  - Added timer integration
+  - Implemented progress tracking
+
+### August 28, 2025 - Major UX Overhaul Required (v3.0)
+- **7:21 AM**: Screenshots revealed critical UX issues
+  - Interface too complex for 9th graders
+  - Calendar entries not visible (too small)
+  - State not persisting on refresh
+  - No confirmation dialogs
+  - Timer controls too small
+  - Poor layout causing cramped display
+  - Tabs not syncing with matrix view
+- **12:00 AM - 1:00 AM**: Emergency fixes implemented
+  - Phase 4: Velocity & Metrics completed
+  - Phase 8.1: State persistence FIXED
+  - Comprehensive UX redesign planned
 
 ## Core Business Requirements
 
@@ -38,7 +75,62 @@ A comprehensive, intelligent study planning application designed for 9th grade s
 
 ### 2. Smart Study Planner Module
 
-#### 2.0 Critical Issues Identified (User Feedback - August 2025)
+#### 2.0 CRITICAL: UX Overhaul Requirements (August 28, 2025)
+**Priority**: HIGHEST - Current interface is unusable for target audience (9th graders)
+
+**Core Problem**: The application has become too complex and intimidating for young students. Screenshots show:
+- Information overload with too many options visible
+- Cramped side-by-side layout on standard screens
+- Calendar cells too small to read chapter names
+- No safety rails (confirmation dialogs)
+- Poor visual hierarchy - everything competes for attention
+
+**Required Solutions**:
+
+##### A. Simplified Information Architecture
+```
+Simple Dashboard (Default View)
+├── Today's Focus Card (Prominent)
+│   ├── Current Task (Large, Clear)
+│   ├── Big Timer Button
+│   └── Progress for Today
+├── Bottom Navigation (Mobile)
+│   ├── Today
+│   ├── Calendar
+│   ├── Subjects
+│   └── More
+└── Progressive Disclosure
+    ├── Basic Features (Always Visible)
+    └── Advanced Features (Hidden Initially)
+```
+
+##### B. Kid-Friendly Design Requirements
+1. **Minimum Sizes**:
+   - Touch targets: 48x48px minimum
+   - Base font: 16px mobile, 14px desktop
+   - Headings: 20-28px
+   - Calendar cells: 120px minimum height
+
+2. **Safety Features**:
+   - Confirmation for ALL destructive actions
+   - Undo/Redo functionality
+   - Auto-save every change
+   - Clear error messages with recovery options
+
+3. **Visual Design**:
+   - Bright, playful colors
+   - Large, clear icons
+   - Fun animations and celebrations
+   - Emoji support throughout
+   - Achievement badges and rewards
+
+##### C. Mobile-First Approach
+- Bottom navigation for thumb reach
+- Swipe gestures for navigation
+- Full-screen modes for focus
+- Portrait optimization
+
+#### 2.1 Critical Issues Identified (User Feedback - August 27-28, 2025)
 Based on real-world usage by students, the following critical issues must be addressed:
 
 **Issue 1: Data Persistence & Import/Export**
@@ -455,8 +547,43 @@ Based on real-world usage by students, the following critical issues must be add
 
 ## Implementation Status & Resolution
 
-### Completed Enhancements (August 27, 2025)
-Based on the critical user feedback, the following features have been implemented:
+### Phase Completion Status (As of August 28, 2025 1:30 AM)
+
+#### ✅ PHASE 1: Foundation Fixes (COMPLETED - Aug 27, 11:20 PM)
+1. **Calendar Task Display** - Fixed data flow to show tasks
+2. **Progress Data Model** - Added actualStudyHours, actualRevisionHours
+3. **Task Creation Flow** - "Add to Calendar" creates visible tasks
+
+#### ✅ PHASE 2: Timer Integration (COMPLETED - Aug 27, 11:35 PM)
+1. **Timer UI Access** - Added modal/panel to MatrixPlannerView
+2. **Timer Start Buttons** - Added Play buttons in calendar and chapters
+3. **Timer-Status Connection** - Timer updates chapter status
+4. **Session Type Selection** - Can choose study vs revision
+
+#### ✅ PHASE 3: Progress Tracking (COMPLETED - Aug 28, 12:00 AM)
+1. **Actual Hours Input** - Number input with +/- buttons
+2. **Progress Persistence** - Store actualHours in Chapter model
+3. **Daily Progress Interface** - Created DailyProgress component
+4. **Progress Bars** - Visual indicators in chapters and daily view
+
+#### ✅ PHASE 4: Velocity & Metrics (COMPLETED - Aug 28, 12:30 AM)
+1. **Velocity Display** - Integrated VelocityIndicator in timer
+2. **Actual vs Planned** - MetricsComparison component
+3. **Daily Metrics** - DailyMetricsPanel component
+4. **Performance Trends** - Historical performance storage
+
+#### ✅ PHASE 8.1: State Persistence (CRITICAL FIX - Aug 28, 1:00 AM)
+- **FIXED**: Calendar entries now persist on page refresh
+- Added plannerDays to store with full CRUD operations
+- Updated all components to use persisted data
+
+#### ❌ REMAINING PHASES (19 features pending):
+- **Phase 5**: Calendar Enhancements (4 features)
+- **Phase 6**: Status Management (4 features)
+- **Phase 7**: Missing Features (4 features)
+- **Phase 8.2-8.12**: UX Overhaul (11 features)
+
+### Completed Enhancements Detail
 
 #### ✅ Issue 1: Data Persistence & Import/Export
 - **Solution Implemented**: Fixed `importData` function in useStore.ts
@@ -561,11 +688,366 @@ Based on the critical user feedback, the following features have been implemente
 
 ---
 
-*Document Version: 2.0*  
-*Last Updated: August 27, 2025*  
-*Status: Phase 2 Completed - Ready for User Testing*
+*Document Version: 3.0*  
+*Last Updated: August 28, 2025 1:30 AM*  
+*Status: Phase 4 Completed - Critical UX Overhaul Required*
+
+## Testing Requirements (Critical for v3.0)
+
+### Automated Testing Suite Requirements
+The following test scenarios must be automated to certify the application as functionally complete:
+
+#### 1. Core Functionality Tests
+- [ ] User can switch between profiles and data persists separately
+- [ ] Chapters can be added with study/revision hours
+- [ ] Calendar displays tasks after adding to planner
+- [ ] Data persists after page refresh (CRITICAL)
+- [ ] Import/Export functionality works correctly
+
+#### 2. Timer Integration Tests  
+- [ ] Timer starts from calendar cell
+- [ ] Timer respects planned hours
+- [ ] Timer updates actual hours on completion
+- [ ] Session type (study/revision) selection works
+- [ ] Auto-progression to next chapter functions
+
+#### 3. Progress Tracking Tests
+- [ ] Actual hours can be updated manually
+- [ ] Progress bars show correct percentages
+- [ ] Daily metrics calculate correctly
+- [ ] Velocity indicators show correct status
+- [ ] Historical data stores properly
+
+#### 4. UX Compliance Tests
+- [ ] All touch targets >= 48x48px
+- [ ] Calendar cells >= 120px height
+- [ ] Font sizes meet minimum requirements
+- [ ] Confirmation dialogs appear for destructive actions
+- [ ] Mobile responsive layout works
+
+#### 5. State Management Tests
+- [ ] plannerDays persist to localStorage
+- [ ] Store updates reflect in all views
+- [ ] Tab synchronization works
+- [ ] No data loss on navigation
+
+### Test Automation Strategy
+```typescript
+// Using Playwright for E2E testing
+describe('Study Planner Critical Path', () => {
+  test('Complete study flow from chapter to timer', async ({ page }) => {
+    // 1. Add chapter
+    // 2. Add to calendar
+    // 3. Start timer
+    // 4. Complete session
+    // 5. Verify progress updates
+    // 6. Refresh and verify persistence
+  });
+});
+```
+
+## Critical Success Criteria for Release
+Before considering the application ready for student use:
+
+1. **Functional Requirements** (17/47 completed - 36%)
+   - ✅ State persistence
+   - ✅ Timer integration
+   - ✅ Progress tracking
+   - ✅ Velocity metrics
+   - ❌ UX simplification (CRITICAL)
+   - ❌ Confirmation dialogs
+   - ❌ Calendar visibility
+   - ❌ Mobile optimization
+
+2. **Performance Requirements**
+   - Build size < 1MB (currently 950KB)
+   - Page load < 3 seconds
+   - Smooth animations (60 FPS)
+   - No memory leaks
+
+3. **Accessibility Requirements**
+   - Keyboard navigation
+   - Screen reader support
+   - Color contrast ratios
+   - Focus indicators
+
+4. **User Experience Requirements**
+   - 9th grader can use without training
+   - Core tasks < 3 clicks
+   - Clear visual hierarchy
+   - Error recovery paths
+
+## Phase 9 - Smart Activity Planning & Tracking System (NEW)
+
+### 🎯 Core Problem Statement (August 28, 2025, 3:00 PM)
+The current system lacks a clear workflow for:
+1. **Planning**: Assigning chapters to specific calendar dates
+2. **Tracking**: Starting, pausing, resuming, and completing activities
+3. **Adapting**: Handling scenarios where students need more time
+4. **Reporting**: Capturing actual vs planned metrics for insights
+
+### Architectural Solution: Activity Lifecycle Management
+
+#### 9.1 Chapter-to-Calendar Assignment Workflow
+**Requirements**:
+- Click any chapter to open assignment modal
+- Select date from calendar picker
+- Choose activity type (Study/Revision)
+- Optional: Set custom duration (override default hours)
+- Visual confirmation of assignment
+- Show assigned chapters as chips in calendar cells
+
+**Implementation**:
+```typescript
+interface ChapterAssignment {
+  id: string;
+  chapterId: string;
+  date: string;
+  activityType: 'study' | 'revision';
+  plannedMinutes: number;
+  actualMinutes?: number;
+  status: 'scheduled' | 'in-progress' | 'paused' | 'completed';
+  startTime?: string;
+  endTime?: string;
+  pausedAt?: string;
+  resumedAt?: string[];
+  completedAt?: string;
+}
+```
+
+#### 9.2 Enhanced Timer with Smart Completion
+**Features**:
+1. **Auto-completion Alert**: When planned time elapses
+2. **Action Options**:
+   - ✅ Complete as planned (records actual = planned)
+   - ⏰ Add more time (15/30/60/90 min increments)
+   - ♾️ Continue indefinitely (manual stop required)
+3. **Notification System**:
+   - 5-min warning before time expires
+   - Modal dialog at completion
+   - Sound/visual alert (optional)
+
+#### 9.3 Pause/Resume Capability
+**Requirements**:
+- Pause button prominently displayed during activity
+- Track pause timestamp and duration
+- Allow resume same day or different day
+- Maintain pause history for audit
+- Show "Paused Activities" section in dashboard
+
+**State Management**:
+```typescript
+interface ActivitySession {
+  sessionId: string;
+  chapterAssignmentId: string;
+  startTime: string;
+  endTime?: string;
+  duration: number; // minutes
+  pausedIntervals: Array<{
+    pausedAt: string;
+    resumedAt?: string;
+    duration?: number;
+  }>;
+  isActive: boolean;
+}
+```
+
+#### 9.4 Performance Analytics Dashboard
+**Metrics to Track**:
+- Planned vs Actual Time (by chapter/subject/overall)
+- On-time Completion Rate
+- Average Overrun Percentage
+- Pause Frequency and Duration
+- Best/Worst Performance Days
+- Subject Velocity Trends
+
+**Recommendations Engine**:
+- "You work faster on Math in mornings"
+- "Consider adding 30% buffer for Physics chapters"
+- "Your revision typically takes 50% of study time"
+- "Break longer chapters into 2 sessions"
+
+#### 9.5 UX Flow for Activity Management
+
+**Starting an Activity**:
+1. Calendar shows assigned chapters as clickable chips
+2. Click chip → Activity Card opens
+3. Shows: Chapter name, planned time, "Start" button
+4. Click Start → Timer begins, status = 'in-progress'
+
+**During Activity**:
+- Floating timer widget (draggable)
+- Shows: Elapsed time, Remaining time, Progress bar
+- Actions: Pause, Stop, Minimize
+- Auto-save progress every minute
+
+**At Time Completion**:
+```
+┌─────────────────────────────────┐
+│   ⏰ Time's Up!                │
+│                                 │
+│   Planned: 2h                  │
+│   Elapsed: 2h                  │
+│                                 │
+│   How would you like to proceed?│
+│                                 │
+│   [✓ Complete]  [+ Add Time]   │
+│   [∞ Continue]                 │
+└─────────────────────────────────┘
+```
+
+**Add Time Dialog**:
+```
+┌─────────────────────────────────┐
+│   Add More Time                │
+│                                 │
+│   Quick Options:               │
+│   [15 min] [30 min] [45 min]   │
+│   [60 min] [90 min] [Custom]   │
+│                                 │
+│   [Confirm]    [Cancel]        │
+└─────────────────────────────────┘
+```
+
+### Implementation Priority
+1. ⏳ Chapter-to-calendar assignment UI
+2. ⏳ Enhanced timer with notifications
+3. ⏳ Pause/resume functionality
+4. ⏳ Activity completion flow
+5. ⏳ Performance dashboard
+6. ⏳ Recommendations engine
+
+### Success Criteria
+- Student can plan week in < 5 minutes
+- Zero lost progress due to forgotten timers
+- 100% activity time captured accurately
+- Clear visibility of actual vs planned
+- Actionable insights from analytics
+
+## Phase 8 - Critical UX Overhaul (IN PROGRESS)
+
+### 🏗️ Major Architectural Decision (August 28, 2025)
+
+#### Problem Analysis from User Feedback
+**Critical Issues Identified**:
+1. **Cramped Layout**: Side-by-side view too dense for 9th graders
+2. **Poor Visibility**: Calendar cells too small to read chapter names
+3. **Information Overload**: Everything visible at once overwhelms users
+4. **Inconsistent State**: Tabs not syncing with matrix changes
+5. **Touch Targets**: Buttons too small for mobile/tablet use
+
+#### Architectural Solution: Tab-Based Component Layout
+
+**New Design Principles**:
+1. **One Focus Area**: Each component gets full viewport when active
+2. **Progressive Disclosure**: Show only what's needed, expand on demand
+3. **Context-Aware UI**: Sidebar/panels appear based on current view
+4. **Mobile-First**: Design for smallest screen, enhance for larger
+
+**Implementation Architecture**:
+```
+MatrixPlannerView (Redesigned)
+├── Header Bar (Fixed)
+│   ├── Title & Help
+│   └── View Switcher [Chapters | Calendar | Analytics]
+├── Context Sidebar (Collapsible)
+│   ├── Quick Actions (in Chapters view)
+│   ├── Subject List with Counts
+│   └── Export/Import Tools
+└── Main Content Area (Full Width)
+    ├── Chapters View: Full-width matrix table
+    ├── Calendar View: Large cells, zoom controls
+    └── Analytics View: Charts and metrics
+```
+
+**Space Allocation Strategy**:
+- **Chapters View**: 80% table, 20% sidebar (collapsible to 5%)
+- **Calendar View**: 100% calendar (no sidebar)
+- **Analytics View**: 100% metrics (no sidebar)
+- **Mobile**: Stack vertically, hide sidebar by default
+
+### Implementation Progress
+
+#### ✅ 8.4 Confirmation Dialogs (COMPLETED)
+- Created reusable ConfirmDialog component with hook pattern
+- Integrated across all destructive operations:
+  - MatrixPlannerView, Settings, Subjects, Calendar
+  - SmartPlanner, StudyPlanManager, EnhancedMatrixEditor
+- Three severity levels: danger (red), warning (yellow), info (blue)
+- Modal backdrop prevents accidental dismissal
+
+#### 🔄 8.3 Calendar Redesign (IN PROGRESS)
+**Planned Changes**:
+- Tab-based navigation replacing side-by-side layout
+- Full viewport width for calendar when active
+- Minimum cell height: 150px (from 80px)
+- Font size: 14px minimum (from 10px)
+- Zoom levels: Small (120px), Medium (150px), Large (200px)
+- Month view addition to week/day views
+- Floating action buttons for common tasks
+
+#### ⏳ 8.5 Timer Controls (PENDING)
+- Minimum button size: 48x48px
+- Clear play/pause/stop states
+- Session type selector prominent
+- Progress ring visualization
+
+#### ⏳ 8.2 Layout Simplification (PENDING)
+- Remove duplicate functionality
+- Consolidate similar features
+- Reduce cognitive load
+
+### Component Synchronization Status
+
+**In Sync** ✅:
+- SmartPlanner (matrix, calendar, plans)
+- Settings (with confirmations)
+
+**Out of Sync** ⚠️:
+- **Today's Plan**: Not using latest chapter status from matrix
+- **Progress Tab**: Not reflecting matrix progress updates
+- **Subjects Tab**: Duplicate of matrix, needs consolidation
+- **Calendar Tab**: Old exam UI, needs matrix integration
+- **Collaboration**: Placeholder features only
+
+### Testing Strategy for Phase 8
+```typescript
+// Critical user flows to test after redesign
+1. Add chapter → View in calendar → Start timer → Complete
+2. Switch views → Verify data consistency
+3. Mobile responsive → Touch targets → Readability
+4. Confirmation dialogs → Prevent data loss
+5. Calendar zoom → Cell visibility → Task labels
+```
+
+## Next Immediate Actions (Phase 9 Priority - Activity Planning)
+1. 🆕 Implement chapter-to-calendar assignment modal (9.1)
+2. 🆕 Add smart timer completion flow (9.2)
+3. 🆕 Build pause/resume capability (9.3)
+4. 🆕 Create activity tracking system (9.4)
+5. 🆕 Design performance dashboard (9.5)
+6. ⏳ Complete remaining Phase 8 items
+
+## Completed Actions (Phase 8)
+1. ✅ Implement confirmation dialogs (8.4) - COMPLETED
+2. 🔄 Redesign calendar with tab layout (8.3) - IN PROGRESS
+3. ⏳ Enhance timer controls visibility (8.5)
+4. ⏳ Simplify overall layout (8.2)
+5. ⏳ Create comprehensive test suite
+6. ⏳ Sync all tabs with matrix state
 
 ## Revision History
+- **v3.1 (August 28, 2025, 3:00 PM)**: Phase 9 - Activity Planning & Tracking System
+  - Added comprehensive activity lifecycle management
+  - Defined timer enhancement requirements
+  - Specified pause/resume capabilities
+  - Added performance analytics requirements
+- **v3.0 (August 28, 2025)**: Critical UX overhaul requirements
+  - Added timeline of requirements evolution
+  - Documented Phase 1-4 completion
+  - Added critical UX issues from screenshots
+  - Added testing requirements
+  - Updated success criteria
 - **v2.0 (August 27, 2025)**: Major update based on user feedback
   - Added critical issues and resolutions
   - Documented completed implementations

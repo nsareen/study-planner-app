@@ -1,6 +1,8 @@
 # Master TODO List - Study Planner Enhancement
 **Created**: August 27, 2025, 11:00 PM
+**Last Updated**: August 28, 2025, 5:30 PM
 **Branch**: feature/complete-study-planner-fix
+**Current Phase**: 9 - Activity Planning & Tracking System
 
 ## Architecture Principles
 1. **TypeScript Compliance**: Use `import type` for all type imports
@@ -215,55 +217,62 @@
 **Target**: Make interface intuitive and kid-friendly for 9th graders
 **Screenshots**: User feedback shows current interface is too complex
 
-#### 8.1 State Persistence Fix ❌ CRITICAL
+#### 8.1 State Persistence Fix ✅ CRITICAL
 - **Issue**: Calendar entries lost on page refresh
-- **Timestamp**: Identified Aug 28, 2025
+- **Timestamp**: FIXED Aug 28, 2025 1:00 AM
 - **Fix**: Ensure plannerDays persist to store
-- **Files**: store/useStore.ts, MatrixPlannerView.tsx
+- **Files**: store/useStore.ts, SmartPlanner.tsx, types/index.ts
 
-#### 8.2 Simplified Layout Design ❌ CRITICAL
+#### 8.2 Simplified Layout Design 🔄 IN PROGRESS
 - **Issue**: Current side-by-side layout too cramped and complex
-- **Timestamp**: Not started
-- **Proposed Fix**: 
-  - Tab-based navigation instead of side-by-side
-  - Full-screen calendar view option
-  - Collapsible panels for matrix
-  - Mobile-first responsive design
-- **Files**: MatrixPlannerView.tsx, SmartPlanner.tsx
+- **Timestamp**: Started Aug 28, 2025 2:30 PM
+- **Architectural Decision**: Tab-based component layout
+  - ✅ Decision documented in business-specifications.md
+  - 🔄 Header with view switcher: [Chapters | Calendar | Analytics]
+  - 🔄 Collapsible context sidebar (20% → 5% width)
+  - 🔄 Full viewport allocation per component
+  - ⏳ Mobile-first responsive stacking
+- **Files**: MatrixPlannerView.tsx (major refactor)
 
-#### 8.3 Calendar Redesign ❌ CRITICAL
+#### 8.3 Calendar Redesign 🔄 IN PROGRESS
 - **Issue**: Calendar too small, entries not visible
-- **Timestamp**: Not started
-- **Fix**: 
-  - Full-width calendar mode
-  - Larger date cells (min 120px height)
-  - Clear task labels with icons
-  - Color coding by subject
-  - Hover tooltips for details
-- **Files**: FlexibleCalendar.tsx, CalendarDayCell.tsx
+- **Timestamp**: Started Aug 28, 2025 2:30 PM
+- **Implementation Plan**: 
+  - 🔄 Full-width calendar in dedicated tab
+  - 🔄 Cell heights: 150px default (was 80px)
+  - 🔄 Font size: 14px minimum (was 10px)
+  - ⏳ Zoom levels: S(120px) M(150px) L(200px)
+  - ⏳ Color coding by subject with legend
+  - ⏳ Floating action buttons for tasks
+  - ⏳ Month view addition
+- **Files**: MatrixPlannerView.tsx, FlexibleCalendar.tsx
 
-#### 8.4 Confirmation Dialogs ❌ CRITICAL
+#### 8.4 Confirmation Dialogs ✅ COMPLETED
 - **Issue**: No warnings when deleting or stopping important actions
-- **Timestamp**: Not started
-- **Fix**: Add confirmations for:
-  - Delete chapter
-  - Delete subject
-  - Remove from calendar
-  - Stop timer
-  - Clear all data
-  - Change user
-- **Files**: New component: ConfirmDialog.tsx
+- **Timestamp**: COMPLETED Aug 28, 2025 2:00 PM
+- **Implementation**: 
+  - ✅ Created reusable ConfirmDialog component
+  - ✅ Added useConfirmDialog hook pattern
+  - ✅ Three severity levels (danger/warning/info)
+  - ✅ Integrated across all components:
+    - Delete chapter (all views)
+    - Delete subject (matrix editor)
+    - Clear all data (settings)
+    - Delete exam groups (calendar)
+    - Delete study plans (plan manager)
+  - ✅ Modal backdrop prevents accidental dismissal
+- **Files**: ConfirmDialog.tsx (created), 7 components updated
 
-#### 8.5 Timer Controls Enhancement ❌ CRITICAL
+#### 8.5 Timer Controls Enhancement ✅ COMPLETED
 - **Issue**: Timer controls too small and hard to see
-- **Timestamp**: Not started
-- **Fix**: 
-  - Larger buttons (min 48px)
-  - Visual feedback on actions
-  - Floating timer widget option
-  - Sound notifications
-  - Progress animations
-- **Files**: TimerControls.tsx, SmartTimer.tsx
+- **Timestamp**: COMPLETED Aug 28, 2025 5:00 PM
+- **Implementation**: 
+  - ✅ Fixed pause/resume functionality with session IDs
+  - ✅ Timer maintains state when paused (not 0:00)
+  - ✅ Added confirmation dialog for task completion
+  - ✅ State sync between Today page and Plan > Today tab
+  - ✅ Proper time calculation excluding pause periods
+- **Files**: TodayPlan.tsx, TodayActivities.tsx
 
 #### 8.6 Progressive Disclosure UI ❌
 - **Issue**: Too much information shown at once
@@ -340,6 +349,131 @@
 
 ---
 
+### PHASE 9: Activity Planning & Tracking System 🆕
+**Target**: Complete activity lifecycle management
+**Added**: August 28, 2025, 3:00 PM
+
+#### 9.1 Chapter-to-Calendar Assignment ⏳
+- **Issue**: No way to assign chapters to specific dates
+- **Solution**:
+  - Add "Schedule" button to each chapter row
+  - Open date picker modal on click
+  - Allow selecting date + study/revision type
+  - Show scheduled chapters as chips in calendar
+  - Drag to reschedule capability
+- **Files**: MatrixPlannerView.tsx, new ChapterScheduler.tsx
+
+#### 9.2 Smart Timer with Auto-Completion ⏳
+- **Issue**: Timer doesn't handle planned time completion
+- **Features**:
+  - Alert at planned time completion
+  - Options: Complete / Add Time / Continue
+  - Time extension in 15/30/60/90 min blocks
+  - Warning notification at 90% time
+  - Prevent forgotten timers
+- **Files**: TimerModal.tsx, new TimerNotification.tsx
+
+#### 9.3 Pause/Resume Functionality ⏳
+- **Issue**: Can't pause and resume activities
+- **Implementation**:
+  - Prominent pause button during activity
+  - Save pause timestamp and state
+  - "Resume Activity" section in dashboard
+  - Multi-day activity support
+  - Pause duration tracking
+- **Files**: TimerModal.tsx, store/useStore.ts
+
+#### 9.4 Activity Session Tracking ⏳
+- **Issue**: No detailed activity history
+- **Data Model**: ActivitySession with pause intervals
+- **Files**: types/index.ts, store/useStore.ts
+
+#### 9.5 Performance Analytics ⏳
+- **Issue**: No insights on study patterns
+- **Metrics**: Actual vs Planned, completion rates, best times
+- **Files**: new PerformanceAnalytics.tsx
+
+---
+
+### ✅ COMPLETED TODAY (Aug 28, 2025, 5:30 PM)
+
+#### Matrix View UX Improvements
+- **Issue**: Matrix view too complex with redundant metrics
+- **Implementation**:
+  - ✅ Removed "Planned Hours" and "Actual Hours" columns 
+  - ✅ Simplified to single "Estimated Time" column
+  - ✅ Changed status from "0/8" to kid-friendly progress bars
+  - ✅ Added percentage displays instead of fractions
+  - ✅ Delete buttons already available for chapters and subjects
+- **Files**: MatrixPlannerView.tsx
+
+#### Delete Functionality for Activities
+- **Issue**: No way to remove scheduled activities
+- **Implementation**:
+  - ✅ Added delete button to scheduled activities
+  - ✅ Protected delete during active timer
+  - ✅ Connected deleteAssignment across all views
+- **Files**: TodayActivities.tsx, MatrixPlannerView.tsx, SmartPlanner.tsx
+
+#### Timer & State Synchronization
+- **Issue**: Timer not pausing correctly, states not syncing
+- **Implementation**:
+  - ✅ Fixed pause/resume with correct session IDs
+  - ✅ Timer maintains value when paused (not 0:00)
+  - ✅ Added confirmation dialog for completion
+  - ✅ Proper time calculation excluding pause periods
+  - ✅ State sync between Today and Plan > Today views
+- **Files**: TodayPlan.tsx, TodayActivities.tsx
+
+### 🏗️ NEW Architecture Implementation (Aug 28, 2025)
+
+**Component Layout Strategy**:
+```
+MatrixPlannerView (Root Container)
+├── Header Bar (Fixed, 80px)
+│   ├── Logo & Title
+│   ├── View Switcher Component
+│   │   ├── Chapters Tab (default)
+│   │   ├── Calendar Tab
+│   │   └── Analytics Tab
+│   └── Help Button
+├── Context Sidebar (Dynamic)
+│   ├── Visible in: Chapters view only
+│   ├── Width: 320px expanded, 64px collapsed
+│   ├── Contents:
+│   │   ├── Quick Actions
+│   │   ├── Subject Summary
+│   │   └── Import/Export
+│   └── Auto-collapse on mobile
+└── Main Content Area (Flex-1)
+    ├── Chapters View
+    │   ├── Full-width matrix table
+    │   ├── Expandable subject rows
+    │   └── Inline editing
+    ├── Calendar View
+    │   ├── 100% viewport width
+    │   ├── No sidebar
+    │   ├── Zoom controls
+    │   └── View mode selector
+    └── Analytics View
+        ├── Full-width charts
+        ├── Progress metrics
+        └── Achievement badges
+```
+
+**Space Allocation Per View**:
+- **Desktop (>1024px)**:
+  - Chapters: 80% content, 20% sidebar
+  - Calendar: 100% content
+  - Analytics: 100% content
+- **Tablet (768-1024px)**:
+  - All views: 100% content
+  - Sidebar: Overlay mode
+- **Mobile (<768px)**:
+  - Stack vertically
+  - Sidebar: Hidden by default
+  - Bottom navigation
+
 ### Proposed New Information Architecture
 
 ```
@@ -388,14 +522,37 @@ Main Dashboard (Simple View)
 
 ---
 
+## Component Sync Requirements (CRITICAL)
+
+### Currently Out of Sync:
+1. **Today's Plan Tab**: 
+   - Not reading from updated chapter status
+   - Should use matrix chapter data
+   
+2. **Progress Tab**:
+   - Not reflecting matrix progress
+   - Should show actualHours from chapters
+   
+3. **Subjects Tab**:
+   - Duplicate of matrix functionality
+   - Should redirect to matrix or be removed
+   
+4. **Calendar Tab**:
+   - Old exam management UI
+   - Should integrate with matrix calendar
+   
+5. **Collaboration Tab**:
+   - Placeholder features only
+   - Low priority for Phase 8
+
 ## Success Criteria
-- All ❌ items become ✅
+- ✅ All confirmation dialogs working
+- 🔄 Tab-based layout implemented
+- 🔄 Calendar has full viewport
+- ⏳ All tabs sync with matrix state
+- ⏳ Mobile responsive design
+- ⏳ Touch targets ≥ 48x48px
+- ⏳ Calendar cells ≥ 150px height
+- ⏳ Font sizes ≥ 14px
 - No TypeScript errors
 - Vercel deployment successful
-- User can:
-  - See tasks in calendar
-  - Start timer from calendar
-  - Track actual vs planned hours
-  - See velocity metrics
-  - Update daily progress
-  - Switch calendar views

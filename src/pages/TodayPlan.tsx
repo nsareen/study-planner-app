@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { generateDailyPlan } from '../utils/prioritization';
-import type { DailyTask } from '../types';
-import { Clock, Play, Pause, Check, SkipForward, RefreshCw, Flame, Star, Sparkles, Target, Trophy, Zap, Coffee, BookOpen, Calendar, HelpCircle } from 'lucide-react';
+import { Clock, Play, Pause, Check, Calendar, Target, Trophy, Zap, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
 
 const motivationalMessages = [
@@ -19,26 +17,31 @@ const motivationalMessages = [
 const TodayPlan: React.FC = () => {
   const {
     chapters,
-    exams,
-    offDays,
-    settings,
-    currentDate,
-    dailyLogs,
-    addDailyLog,
-    updateDailyTask,
-    updateChapterProgress,
+    chapterAssignments,
+    activitySessions,
+    startActivity,
+    pauseActivity,
+    resumeActivity,
+    completeActivity,
+    getActiveSession
   } = useStore();
   
-  const [todaysTasks, setTodaysTasks] = useState<DailyTask[]>([]);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-  const [timer, setTimer] = useState<number>(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const [timer, setTimer] = useState<{ [key: string]: number }>({});
   const [motivationalMessage, setMotivationalMessage] = useState(motivationalMessages[0]);
-  const [showPlanOptions, setShowPlanOptions] = useState(false);
-  const [customHours, setCustomHours] = useState(settings.dailyStudyHours);
-  const [focusSubject, setFocusSubject] = useState<string>('all');
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
   
-  const todaysLog = dailyLogs.find((log) => log.date === currentDate);
+  // Get only today's scheduled assignments
+  const todaysAssignments = chapterAssignments.filter(a => a.date === todayStr);
+  const activeSession = getActiveSession();
+  
+  // Calculate overall progress
+  const totalTasks = todaysAssignments.length;
+  const completedTasks = todaysAssignments.filter(a => a.status === 'completed').length;
+  const inProgressTasks = todaysAssignments.filter(a => a.status === 'in-progress').length;
+  const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  
+  const totalPlannedMinutes = todaysAssignments.reduce((sum, a) => sum + a.plannedMinutes, 0);
+  const totalActualMinutes = todaysAssignments.reduce((sum, a) => sum + (a.actualMinutes || 0), 0);
   
   useEffect(() => {
     const interval = setInterval(() => {
@@ -47,512 +50,304 @@ const TodayPlan: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
   
-  // Close modal on Escape key
+  // Timer effect for active sessions
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showPlanOptions) {
-        setShowPlanOptions(false);
-        setCustomHours(settings.dailyStudyHours);
-        setFocusSubject('all');
+    if (!activeSession) return;
+    
+    // Calculate total paused time
+    const calculateElapsedTime = () => {
+      const totalPausedMs = activeSession.pausedIntervals.reduce((total, interval) => {
+        if (interval.resumedAt) {
+          return total + (new Date(interval.resumedAt).getTime() - new Date(interval.pausedAt).getTime());
+        } else if (!activeSession.isActive) {
+          // Currently paused - don't count this pause period yet
+          return total;
+        }
+        return total;
+      }, 0);
+      
+      let activeTime;
+      if (activeSession.isActive) {
+        // Running - calculate up to now
+        activeTime = Date.now() - new Date(activeSession.startTime).getTime() - totalPausedMs;
+      } else {
+        // Paused - calculate up to when it was paused
+        const lastPausedAt = activeSession.pausedIntervals[activeSession.pausedIntervals.length - 1]?.pausedAt;
+        const pausedTime = lastPausedAt ? new Date(lastPausedAt).getTime() : Date.now();
+        activeTime = pausedTime - new Date(activeSession.startTime).getTime() - totalPausedMs;
       }
+      
+      return Math.floor(activeTime / 1000);
     };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [showPlanOptions, settings.dailyStudyHours]);
-  
-  useEffect(() => {
-    if (!todaysLog) {
-      const tasks = generateDailyPlan(
-        chapters,
-        exams,
-        offDays,
-        currentDate,
-        settings.dailyStudyHours,
-        settings.studySessionMinutes
-      );
-      setTodaysTasks(tasks);
-      if (tasks.length > 0) {
-        addDailyLog({
-          date: currentDate,
-          tasks,
-          totalAllocatedMinutes: tasks.reduce((acc, task) => acc + task.allocatedMinutes, 0),
-          totalActualMinutes: 0,
-        });
-      }
-    } else {
-      setTodaysTasks(todaysLog.tasks);
-    }
-  }, [chapters, exams, offDays, currentDate, settings, dailyLogs]);
-  
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isTimerRunning) {
-      interval = setInterval(() => {
-        setTimer((prev) => prev + 1);
+    
+    // Set initial time
+    const elapsed = calculateElapsedTime();
+    setTimer(prev => ({ ...prev, [activeSession.assignmentId]: elapsed }));
+    
+    // Only update timer if running
+    if (activeSession.isActive) {
+      const interval = setInterval(() => {
+        const elapsed = calculateElapsedTime();
+        setTimer(prev => ({ ...prev, [activeSession.assignmentId]: elapsed }));
       }, 1000);
+      
+      return () => clearInterval(interval);
     }
-    return () => clearInterval(interval);
-  }, [isTimerRunning]);
-  
-  const handleStartTask = (taskId: string) => {
-    setActiveTaskId(taskId);
-    setTimer(0);
-    setIsTimerRunning(true);
-    if (todaysLog) {
-      updateDailyTask(todaysLog.id, taskId, { status: 'in-progress' });
-    }
-  };
-  
-  const handlePauseTask = () => {
-    setIsTimerRunning(false);
-  };
-  
-  const handleResumeTask = () => {
-    setIsTimerRunning(true);
-  };
-  
-  const handleCompleteTask = (taskId: string) => {
-    const actualMinutes = Math.floor(timer / 60);
-    if (todaysLog) {
-      updateDailyTask(todaysLog.id, taskId, {
-        status: 'completed',
-        actualMinutes,
-      });
-      const task = todaysTasks.find((t) => t.id === taskId);
-      if (task) {
-        updateChapterProgress(task.chapterId, actualMinutes / 60);
-      }
-    }
-    setActiveTaskId(null);
-    setTimer(0);
-    setIsTimerRunning(false);
-  };
-  
-  const handleSkipTask = (taskId: string) => {
-    if (todaysLog) {
-      updateDailyTask(todaysLog.id, taskId, { status: 'skipped' });
-    }
-    if (activeTaskId === taskId) {
-      setActiveTaskId(null);
-      setTimer(0);
-      setIsTimerRunning(false);
-    }
-  };
-  
-  const regeneratePlan = () => {
-    // Filter chapters based on focus subject if selected
-    let filteredChapters = chapters;
-    if (focusSubject !== 'all') {
-      filteredChapters = chapters.filter(ch => ch.subject === focusSubject);
-    }
-    
-    const tasks = generateDailyPlan(
-      filteredChapters,
-      exams,
-      offDays,
-      currentDate,
-      customHours,
-      settings.studySessionMinutes
-    );
-    
-    // Shuffle tasks if user wants variety
-    const shuffledTasks = [...tasks].sort(() => Math.random() - 0.5);
-    
-    setTodaysTasks(shuffledTasks);
-    if (shuffledTasks.length > 0) {
-      addDailyLog({
-        date: currentDate,
-        tasks: shuffledTasks,
-        totalAllocatedMinutes: shuffledTasks.reduce((acc, task) => acc + task.allocatedMinutes, 0),
-        totalActualMinutes: 0,
-      });
-    }
-    setShowPlanOptions(false);
-    setCustomHours(settings.dailyStudyHours);
-    setFocusSubject('all');
-  };
+  }, [activeSession]);
   
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+    return `${minutes}:${String(secs).padStart(2, '0')}`;
   };
   
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'from-green-400 to-emerald-500';
-      case 'in-progress':
-        return 'from-blue-400 to-indigo-500';
-      case 'skipped':
-        return 'from-gray-400 to-gray-500';
-      default:
-        return 'from-yellow-400 to-orange-500';
+  const handleStartActivity = (assignmentId: string) => {
+    startActivity(assignmentId);
+    setTimer(prev => ({ ...prev, [assignmentId]: 0 }));
+  };
+  
+  const handleCompleteActivity = (assignmentId: string) => {
+    if (!activeSession || activeSession.assignmentId !== assignmentId) return;
+    
+    const elapsedMinutes = Math.floor((timer[assignmentId] || 0) / 60);
+    const confirmMessage = `Are you sure you want to complete this task?\n\nTime spent: ${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`;
+    
+    if (window.confirm(confirmMessage)) {
+      completeActivity(activeSession.sessionId, elapsedMinutes);
+      setTimer(prev => {
+        const newTimer = { ...prev };
+        delete newTimer[assignmentId];
+        return newTimer;
+      });
     }
   };
   
-  const getSubjectEmoji = (subject: string) => {
-    const emojis: { [key: string]: string } = {
-      'Mathematics': '🔢',
-      'Science': '🔬',
-      'English': '📖',
-      'History': '🏛️',
-      'Geography': '🌍',
-      'Computer': '💻',
-      'Physics': '⚡',
-      'Chemistry': '🧪',
-      'Biology': '🌿',
-      'Art': '🎨',
-    };
-    return emojis[subject] || '📚';
+  const getChapterForAssignment = (assignment: typeof todaysAssignments[0]) => {
+    return chapters.find(c => c.id === assignment.chapterId);
   };
   
-  const totalAllocated = todaysTasks.reduce((acc, task) => acc + task.allocatedMinutes, 0);
-  const totalCompleted = todaysTasks
-    .filter((t) => t.status === 'completed')
-    .reduce((acc, task) => acc + (task.actualMinutes || 0), 0);
-  const completionPercentage = totalAllocated > 0 ? Math.round((totalCompleted / totalAllocated) * 100) : 0;
-  
-  // Get unique subjects from chapters
-  const uniqueSubjects = Array.from(new Set(chapters.map(ch => ch.subject)));
+  const getPriorityLabel = (priority: number) => {
+    if (priority >= 0.8) return { text: 'High', color: 'text-red-600 bg-red-100' };
+    if (priority >= 0.5) return { text: 'Medium', color: 'text-yellow-600 bg-yellow-100' };
+    return { text: 'Low', color: 'text-green-600 bg-green-100' };
+  };
   
   return (
-    <div className="space-y-6">
-      <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl p-8 card-hover">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-4xl font-black gradient-text flex items-center gap-3">
-              Today's Mission 
-              <Sparkles className="w-8 h-8 text-accent-yellow animate-pulse" />
-            </h2>
-            <p className="text-gray-600 mt-2 font-medium text-lg">{format(new Date(currentDate), 'EEEE, MMMM d, yyyy')}</p>
-            <p className="text-primary-600 font-bold mt-2 animate-pulse-slow">{motivationalMessage}</p>
-          </div>
-          <button
-            onClick={() => setShowPlanOptions(true)}
-            className="group flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-2xl hover:shadow-xl transform transition-all duration-300 hover:scale-105 font-bold"
-          >
-            <RefreshCw className="w-5 h-5 group-hover:animate-spin" />
-            New Plan
-          </button>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-2xl p-5 transform transition-all hover:scale-105">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-purple-700">Total Time</p>
-              <Target className="w-5 h-5 text-purple-600" />
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50 p-4">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+                Today's Mission <Target className="w-8 h-8 text-yellow-500 animate-pulse" />
+              </h1>
+              <p className="text-gray-600">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
+              <p className="text-purple-600 font-medium animate-fade-in mt-1">{motivationalMessage}</p>
             </div>
-            <p className="text-3xl font-black text-purple-900">{Math.floor(totalAllocated / 60)}h {totalAllocated % 60}m</p>
           </div>
           
-          <div className="bg-gradient-to-br from-green-100 to-emerald-100 rounded-2xl p-5 transform transition-all hover:scale-105">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-green-700">Completed</p>
-              <Trophy className="w-5 h-5 text-green-600" />
-            </div>
-            <p className="text-3xl font-black text-green-900">{Math.floor(totalCompleted / 60)}h {totalCompleted % 60}m</p>
-          </div>
-          
-          <div className="bg-gradient-to-br from-blue-100 to-cyan-100 rounded-2xl p-5 transform transition-all hover:scale-105">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-blue-700">Timer</p>
-              <Clock className="w-5 h-5 text-blue-600 animate-pulse" />
-            </div>
-            <p className="text-3xl font-black text-blue-900">{formatTime(timer)}</p>
-          </div>
-          
-          <div className="bg-gradient-to-br from-orange-100 to-red-100 rounded-2xl p-5 transform transition-all hover:scale-105">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-orange-700">Progress</p>
-              <Flame className="w-5 h-5 text-orange-600 animate-bounce-slow" />
-            </div>
-            <p className="text-3xl font-black text-orange-900">{completionPercentage}%</p>
-          </div>
-        </div>
-        
-        {completionPercentage >= 100 && (
-          <div className="mb-6 bg-gradient-to-r from-green-400 to-emerald-500 text-white rounded-2xl p-6 text-center animate-bounce-slow">
-            <Trophy className="w-12 h-12 mx-auto mb-2" />
-            <h3 className="text-2xl font-black">MISSION COMPLETE! 🎉</h3>
-            <p className="mt-2">You're absolutely amazing! Take a well-deserved break!</p>
-          </div>
-        )}
-        
-        {todaysTasks.length === 0 ? (
-          <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl">
-            <div className="max-w-md mx-auto">
-              {chapters.length === 0 ? (
-                <>
-                  <BookOpen className="w-16 h-16 text-primary-400 mx-auto mb-4 animate-float" />
-                  <h3 className="text-2xl font-bold text-gray-800 mb-2">Welcome to Study Hero! 🎆</h3>
-                  <p className="text-gray-600 mb-6">Let's set up your personalized study plan to ace those exams!</p>
-                  
-                  <div className="bg-white rounded-xl p-4 mb-6 shadow-sm">
-                    <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                      <Target className="w-5 h-5 text-green-500" />
-                      Get Started in 2 Minutes:
-                    </h4>
-                    <div className="text-left space-y-2 text-sm text-gray-700">
-                      <div className="flex items-center gap-3">
-                        <span className="bg-primary-100 text-primary-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">1</span>
-                        <span>Add your subjects and chapters in <strong>Subjects</strong> tab</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="bg-primary-100 text-primary-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">2</span>
-                        <span>Schedule exam dates in <strong>Calendar</strong> tab</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="bg-primary-100 text-primary-600 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">3</span>
-                        <span>Get your smart daily study plan right here!</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <a href="/subjects" className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
-                      <BookOpen className="w-4 h-4" />
-                      Add Subjects
-                    </a>
-                    <a href="/help" className="px-6 py-3 bg-white text-gray-700 rounded-xl font-semibold border-2 border-gray-200 hover:border-primary-300 hover:shadow-md transition-all flex items-center gap-2">
-                      <HelpCircle className="w-4 h-4" />
-                      Watch Tutorial
-                    </a>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Coffee className="w-16 h-16 text-gray-400 mx-auto mb-4 animate-float" />
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">It's a rest day! 🌈</h3>
-                  <p className="text-gray-600 mb-4">No study tasks for today. Enjoy your break or create a custom plan!</p>
-                  
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <button
-                      onClick={() => setShowPlanOptions(true)}
-                      className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
-                    >
-                      🎯 Create Custom Plan
-                    </button>
-                    <a href="/calendar" className="px-6 py-3 bg-white text-gray-700 rounded-xl font-semibold border-2 border-gray-200 hover:border-primary-300 hover:shadow-md transition-all flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      Check Calendar
-                    </a>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {todaysTasks.map((task, index) => (
-              <div
-                key={task.id}
-                className={`relative overflow-hidden rounded-2xl p-6 transition-all duration-500 ${
-                  activeTaskId === task.id 
-                    ? 'bg-gradient-to-r from-primary-100 to-secondary-100 scale-[1.02] shadow-xl' 
-                    : 'bg-white hover:shadow-xl hover:scale-[1.01]'
-                } ${task.status === 'completed' ? 'opacity-90' : ''}`}
-              >
-                {task.status === 'completed' && (
-                  <div className="absolute top-2 right-2">
-                    <Star className="w-8 h-8 text-yellow-500 fill-yellow-500 animate-pulse" />
-                  </div>
-                )}
-                
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-3xl">{getSubjectEmoji(task.subject)}</span>
-                      <div>
-                        <h3 className="font-black text-xl text-gray-800">{task.subject}</h3>
-                        <p className="text-gray-600 font-medium">{task.chapterName}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap items-center gap-4 mt-4">
-                      <span className={`px-4 py-1.5 rounded-full text-white font-bold text-sm bg-gradient-to-r ${getStatusColor(task.status)}`}>
-                        {task.status.replace('-', ' ').toUpperCase()}
-                      </span>
-                      <span className="flex items-center gap-1 text-gray-600 font-medium">
-                        <Clock size={16} />
-                        {task.allocatedMinutes} min
-                      </span>
-                      {task.actualMinutes && (
-                        <span className="flex items-center gap-1 text-green-600 font-bold">
-                          <Check size={16} />
-                          {task.actualMinutes} min done
-                        </span>
-                      )}
-                      <span className="flex items-center gap-1 text-purple-600 font-bold">
-                        <Zap size={16} />
-                        Priority: {task.priority.toFixed(1)}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2 ml-4">
-                    {task.status === 'pending' && activeTaskId !== task.id && (
-                      <button
-                        onClick={() => handleStartTask(task.id)}
-                        className="p-3 bg-gradient-to-r from-green-400 to-emerald-500 text-white rounded-xl hover:shadow-lg transform transition-all hover:scale-110"
-                      >
-                        <Play size={20} />
-                      </button>
-                    )}
-                    
-                    {activeTaskId === task.id && isTimerRunning && (
-                      <button
-                        onClick={handlePauseTask}
-                        className="p-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-xl hover:shadow-lg transform transition-all hover:scale-110"
-                      >
-                        <Pause size={20} />
-                      </button>
-                    )}
-                    
-                    {activeTaskId === task.id && !isTimerRunning && task.status === 'in-progress' && (
-                      <button
-                        onClick={handleResumeTask}
-                        className="p-3 bg-gradient-to-r from-blue-400 to-indigo-500 text-white rounded-xl hover:shadow-lg transform transition-all hover:scale-110"
-                      >
-                        <Play size={20} />
-                      </button>
-                    )}
-                    
-                    {activeTaskId === task.id && (
-                      <button
-                        onClick={() => handleCompleteTask(task.id)}
-                        className="p-3 bg-gradient-to-r from-green-400 to-emerald-500 text-white rounded-xl hover:shadow-lg transform transition-all hover:scale-110"
-                      >
-                        <Check size={20} />
-                      </button>
-                    )}
-                    
-                    {task.status !== 'completed' && task.status !== 'skipped' && (
-                      <button
-                        onClick={() => handleSkipTask(task.id)}
-                        className="p-3 bg-gradient-to-r from-gray-400 to-gray-500 text-white rounded-xl hover:shadow-lg transform transition-all hover:scale-110"
-                      >
-                        <SkipForward size={20} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                
-                {activeTaskId === task.id && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="flex items-center justify-center gap-2">
-                      <Sparkles className="text-primary-500 animate-pulse" />
-                      <span className="font-bold text-primary-600">Study session in progress...</span>
-                      <Sparkles className="text-primary-500 animate-pulse" />
-                    </div>
-                  </div>
-                )}
+          {/* Progress Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+            <div className="bg-gradient-to-br from-purple-100 to-pink-100 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-purple-600 font-semibold">Total Time</span>
+                <Clock className="w-5 h-5 text-purple-500" />
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-      
-      {/* Plan Options Modal */}
-      {showPlanOptions && (
-        <div 
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowPlanOptions(false);
-              setCustomHours(settings.dailyStudyHours);
-              setFocusSubject('all');
-            }
-          }}
-        >
-          <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl transform transition-all duration-300 scale-100">
-            <h3 className="text-2xl font-black gradient-text mb-6 flex items-center gap-2">
-              <Sparkles className="w-6 h-6 animate-pulse" />
-              Customize Your Study Plan
-            </h3>
+              <div className="text-2xl font-bold text-purple-800">
+                {Math.floor(totalPlannedMinutes / 60)}h {totalPlannedMinutes % 60}m
+              </div>
+            </div>
             
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-3">
-                  Study Hours for Today 🕐
-                </label>
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-4">
-                  <div className="flex items-center gap-4 mb-3">
-                    <span className="text-3xl font-black bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent min-w-[80px] text-center">
-                      {customHours}h
-                    </span>
-                    <input
-                      type="range"
-                      min="1"
-                      max="15"
-                      value={customHours}
-                      onChange={(e) => setCustomHours(parseInt(e.target.value))}
-                      className="flex-1"
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-500 px-2">
-                    <span>1h</span>
-                    <span>5h</span>
-                    <span>10h</span>
-                    <span>15h</span>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  {customHours <= 3 ? '💤 Light day - perfect for review!' :
-                   customHours <= 6 ? '⚡ Balanced - great for steady progress!' :
-                   customHours <= 9 ? '🔥 Focused - you\'re on fire!' :
-                   customHours <= 12 ? '🚀 Intense mode - champion level!' :
-                   '💎 ULTIMATE GRIND - legendary dedication!'}
-                </p>
+            <div className="bg-gradient-to-br from-green-100 to-emerald-100 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-green-600 font-semibold">Completed</span>
+                <Trophy className="w-5 h-5 text-green-500" />
               </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                  Focus on Specific Subject? 📚
-                </label>
-                <select
-                  value={focusSubject}
-                  onChange={(e) => setFocusSubject(e.target.value)}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary-500 focus:outline-none font-medium"
-                >
-                  <option value="all">🎯 All Subjects (Balanced)</option>
-                  {uniqueSubjects.map(subject => (
-                    <option key={subject} value={subject}>
-                      {getSubjectEmoji(subject)} {subject} Only
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">Choose a subject to focus on, or keep it balanced!</p>
+              <div className="text-2xl font-bold text-green-800">
+                {Math.floor(totalActualMinutes / 60)}h {totalActualMinutes % 60}m
               </div>
-              
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4">
-                <p className="text-sm font-medium text-purple-700">
-                  💡 <strong>Pro Tip:</strong> Mixing subjects helps prevent boredom and improves retention!
-                </p>
+            </div>
+            
+            <div className="bg-gradient-to-br from-blue-100 to-cyan-100 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-blue-600 font-semibold">Timer</span>
+                <Clock className="w-5 h-5 text-blue-500 animate-spin-slow" />
               </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={regeneratePlan}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-green-400 to-emerald-500 text-white rounded-xl font-bold hover:shadow-xl transform transition-all hover:scale-105"
-                >
-                  Generate Plan 🚀
-                </button>
-                <button
-                  onClick={() => {
-                    setShowPlanOptions(false);
-                    setCustomHours(settings.dailyStudyHours);
-                    setFocusSubject('all');
-                  }}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-bold hover:bg-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
+              <div className="text-2xl font-bold text-blue-800">
+                {activeSession ? formatTime(timer[activeSession.assignmentId] || 0) : '00:00'}
               </div>
+            </div>
+            
+            <div className="bg-gradient-to-br from-orange-100 to-amber-100 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-orange-600 font-semibold">Progress</span>
+                <Zap className="w-5 h-5 text-orange-500" />
+              </div>
+              <div className="text-2xl font-bold text-orange-800">{progressPercentage}%</div>
             </div>
           </div>
         </div>
-      )}
+        
+        {/* Tasks List */}
+        <div className="space-y-4">
+          {todaysAssignments.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold text-gray-700 mb-2">No Activities Scheduled for Today</h2>
+              <p className="text-gray-600 mb-4">
+                You haven't scheduled any chapters for today yet.
+              </p>
+              <p className="text-sm text-gray-500">
+                Go to the <span className="font-semibold">Plan</span> page to schedule chapters for today.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Active Task Highlight */}
+              {activeSession && (
+                <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl shadow-xl p-6 text-white">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm opacity-90 mb-1">Currently Working On</p>
+                      <h3 className="text-2xl font-bold">
+                        {getChapterForAssignment(todaysAssignments.find(a => a.id === activeSession.assignmentId))?.name || 'Activity'}
+                      </h3>
+                    </div>
+                    <div className="text-4xl font-mono font-bold">
+                      {formatTime(timer[activeSession.assignmentId] || 0)}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Task Cards */}
+              {todaysAssignments.map((assignment) => {
+                const chapter = getChapterForAssignment(assignment);
+                const priorityInfo = getPriorityLabel(assignment.priority || 0);
+                const isActive = activeSession?.assignmentId === assignment.id;
+                const isPaused = isActive && !activeSession?.isActive;
+                const taskTimer = timer[assignment.id] || 0;
+                
+                if (!chapter) return null;
+                
+                return (
+                  <div
+                    key={assignment.id}
+                    className={`bg-white rounded-xl shadow-lg overflow-hidden transition-all ${
+                      isActive ? 'ring-4 ring-purple-500 ring-opacity-50' : ''
+                    } ${assignment.status === 'completed' ? 'opacity-75' : ''}`}
+                  >
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <BookOpen className="w-5 h-5 text-blue-500" />
+                            <h3 className="text-xl font-bold text-gray-800">{chapter.subject}</h3>
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              assignment.status === 'completed' ? 'bg-green-100 text-green-700' :
+                              assignment.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {assignment.status === 'completed' ? 'COMPLETED' :
+                               assignment.status === 'in-progress' ? 'IN PROGRESS' :
+                               assignment.status === 'skipped' ? 'SKIPPED' : 'PENDING'}
+                            </span>
+                          </div>
+                          <p className="text-gray-700 font-medium">{chapter.name}</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Clock className="w-4 h-4 text-gray-500" />
+                            <span className="text-gray-700 font-medium">
+                              {Math.floor(assignment.plannedMinutes / 60) > 0 && `${Math.floor(assignment.plannedMinutes / 60)}h `}
+                              {assignment.plannedMinutes % 60}min
+                            </span>
+                          </div>
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${priorityInfo.color}`}>
+                            Priority: {priorityInfo.text}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {!isActive && assignment.status !== 'completed' && (
+                            <button
+                              onClick={() => handleStartActivity(assignment.id)}
+                              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                            >
+                              <Play size={16} />
+                              Start
+                            </button>
+                          )}
+                          
+                          {isActive && activeSession?.isActive && (
+                            <button
+                              onClick={() => pauseActivity(activeSession.sessionId)}
+                              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+                            >
+                              <Pause size={16} />
+                              Pause
+                            </button>
+                          )}
+                          
+                          {isActive && !activeSession?.isActive && (
+                            <button
+                              onClick={() => resumeActivity(activeSession.sessionId)}
+                              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                            >
+                              <Play size={16} />
+                              Resume
+                            </button>
+                          )}
+                          
+                          {isActive && (
+                            <button
+                              onClick={() => handleCompleteActivity(assignment.id)}
+                              className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                            >
+                              <Check size={16} />
+                              Complete
+                            </button>
+                          )}
+                        </div>
+                        
+                        {isActive && (
+                          <div className="text-2xl font-mono font-bold text-purple-600">
+                            {formatTime(taskTimer)}
+                          </div>
+                        )}
+                        
+                        {assignment.status === 'completed' && assignment.actualMinutes && (
+                          <div className="text-sm text-gray-600">
+                            Completed in {Math.floor(assignment.actualMinutes / 60)}h {assignment.actualMinutes % 60}m
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Progress Celebration */}
+              {progressPercentage === 100 && (
+                <div className="bg-gradient-to-r from-green-400 to-blue-500 rounded-2xl shadow-xl p-8 text-white text-center">
+                  <Trophy className="w-16 h-16 mx-auto mb-4 animate-bounce" />
+                  <h2 className="text-3xl font-bold mb-2">Mission Complete! 🎉</h2>
+                  <p className="text-lg">You've completed all your tasks for today. Great job!</p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -11,7 +11,7 @@ import {
   Info
 } from 'lucide-react';
 import { format, addDays, addWeeks, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, isToday } from 'date-fns';
-import type { Chapter, Exam } from '../../types';
+import type { Chapter, Exam, ChapterAssignment } from '../../types';
 import CalendarDayCell from './CalendarDayCell';
 import CalendarControls from './CalendarControls';
 import ChapterTooltip from './ChapterTooltip';
@@ -19,6 +19,7 @@ import ChapterTooltip from './ChapterTooltip';
 interface FlexibleCalendarProps {
   chapters: Chapter[];
   exams: Exam[];
+  chapterAssignments?: ChapterAssignment[];
   plannedTasks: any[]; // Will be properly typed later
   onDateSelect: (date: Date, type: 'study' | 'revision') => void;
   onChapterStatusUpdate: (chapterId: string, status: string) => void;
@@ -30,6 +31,7 @@ type ZoomLevel = 'small' | 'medium' | 'large';
 const FlexibleCalendar: React.FC<FlexibleCalendarProps> = ({
   chapters,
   exams,
+  chapterAssignments = [],
   plannedTasks,
   onDateSelect,
   onChapterStatusUpdate,
@@ -98,9 +100,9 @@ const FlexibleCalendar: React.FC<FlexibleCalendarProps> = ({
 
   const getCellSize = () => {
     const sizes = {
-      small: 'h-20',
-      medium: 'h-32',
-      large: 'h-44'
+      small: 'h-28',
+      medium: 'h-40',
+      large: 'h-52'
     };
     return sizes[zoomLevel];
   };
@@ -124,6 +126,12 @@ const FlexibleCalendar: React.FC<FlexibleCalendarProps> = ({
   const getTasksForDate = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return plannedTasks.filter(task => task.date === dateStr);
+  };
+
+  // Get chapter assignments for a specific date
+  const getAssignmentsForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return chapterAssignments.filter(assignment => assignment.date === dateStr);
   };
 
   // Get exams for a specific date
@@ -165,6 +173,7 @@ const FlexibleCalendar: React.FC<FlexibleCalendarProps> = ({
         <div className={`grid ${getGridColumns()} gap-2`}>
           {viewDates.map((date, index) => {
             const tasks = getTasksForDate(date);
+            const assignments = getAssignmentsForDate(date);
             const dayExams = getExamsForDate(date);
             const isCurrentMonth = viewMode === 'monthly' ? 
               date.getMonth() === currentDate.getMonth() : true;
@@ -174,6 +183,8 @@ const FlexibleCalendar: React.FC<FlexibleCalendarProps> = ({
                 key={index}
                 date={date}
                 tasks={tasks}
+                assignments={assignments}
+                chapters={chapters}
                 exams={dayExams}
                 isToday={isToday(date)}
                 isCurrentMonth={isCurrentMonth}

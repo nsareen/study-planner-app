@@ -1,193 +1,140 @@
-import React, { useMemo } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, BookOpen, Clock, Target } from 'lucide-react';
-import { format, subDays, parseISO } from 'date-fns';
-import { getSubjectStats } from '../utils/prioritization';
+import SimpleAnalytics from '../components/SimpleAnalytics';
+import DetailedAnalytics from '../components/DetailedAnalytics';
+import { Lock, Unlock, Eye, EyeOff } from 'lucide-react';
 
 const Progress: React.FC = () => {
-  const { chapters, dailyLogs, currentDate } = useStore();
+  const { 
+    chapters, 
+    exams,
+    chapterAssignments,
+    activitySessions,
+    dailyLogs,
+    getCurrentUser,
+    settings,
+    updateSettings
+  } = useStore();
   
-  const subjectStats = useMemo(() => getSubjectStats(chapters), [chapters]);
+  const currentUser = getCurrentUser();
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [enteredPin, setEnteredPin] = useState('');
+  const [pinError, setPinError] = useState(false);
   
-  const weeklyData = useMemo(() => {
-    const data = [];
-    for (let i = 6; i >= 0; i--) {
-      const date = format(subDays(parseISO(currentDate), i), 'yyyy-MM-dd');
-      const log = dailyLogs.find((l) => l.date === date);
-      data.push({
-        date: format(subDays(parseISO(currentDate), i), 'EEE'),
-        planned: log ? Math.round(log.totalAllocatedMinutes / 60 * 10) / 10 : 0,
-        actual: log ? Math.round(log.totalActualMinutes / 60 * 10) / 10 : 0,
-      });
+  // Calculate streak from user profile or daily activity
+  const currentStreak = currentUser?.streak || 0;
+  const level = currentUser?.level || 1;
+  
+  const handleParentModeToggle = () => {
+    if (settings.parentModeEnabled) {
+      // Turning off parent mode
+      updateSettings({ parentModeEnabled: false });
+    } else {
+      // Show PIN dialog to turn on parent mode
+      setShowPinDialog(true);
+      setPinError(false);
+      setEnteredPin('');
     }
-    return data;
-  }, [dailyLogs, currentDate]);
+  };
   
-  const subjectProgressData = useMemo(() => {
-    return Array.from(subjectStats.entries()).map(([subject, stats]) => ({
-      subject,
-      completed: stats.completedHours,
-      remaining: stats.totalHours - stats.completedHours,
-      percentage: Math.round((stats.completedHours / stats.totalHours) * 100),
-    }));
-  }, [subjectStats]);
-  
-  const chapterStatusData = useMemo(() => {
-    const statusCounts = {
-      'Not Started': chapters.filter((c) => c.status === 'not_started').length,
-      'In Progress': chapters.filter((c) => c.status === 'in_progress').length,
-      'Completed': chapters.filter((c) => c.status === 'complete').length,
-    };
-    return Object.entries(statusCounts).map(([status, count]) => ({
-      name: status,
-      value: count,
-    }));
-  }, [chapters]);
-  
-  const COLORS = ['#ef4444', '#3b82f6', '#10b981'];
-  
-  const totalStats = useMemo(() => {
-    const totalHours = chapters.reduce((acc, ch) => acc + ch.estimatedHours, 0);
-    const completedHours = chapters.reduce((acc, ch) => acc + (ch.studyProgress || 0), 0);
-    const totalChapters = chapters.length;
-    const completedChapters = chapters.filter((c) => c.status === 'complete').length;
-    
-    return {
-      totalHours,
-      completedHours,
-      totalChapters,
-      completedChapters,
-      progressPercentage: totalHours > 0 ? Math.round((completedHours / totalHours) * 100) : 0,
-    };
-  }, [chapters]);
+  const handlePinSubmit = () => {
+    if (enteredPin === settings.parentModePIN) {
+      updateSettings({ parentModeEnabled: true });
+      setShowPinDialog(false);
+      setEnteredPin('');
+      setPinError(false);
+    } else {
+      setPinError(true);
+    }
+  };
   
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total Progress</p>
-              <p className="text-2xl font-bold text-gray-900">{totalStats.progressPercentage}%</p>
-            </div>
-            <TrendingUp className="text-primary-500" size={32} />
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
+      <div className="max-w-6xl mx-auto">
+        {/* Parent Mode Toggle - Hidden in corner */}
+        <div className="fixed top-4 right-4 z-50">
+          <button
+            onClick={handleParentModeToggle}
+            className="p-2 bg-white/80 backdrop-blur-sm rounded-lg shadow-md hover:shadow-lg transition-all"
+            title={settings.parentModeEnabled ? 'Exit Parent Mode' : 'Enter Parent Mode'}
+          >
+            {settings.parentModeEnabled ? (
+              <Unlock className="w-5 h-5 text-indigo-600" />
+            ) : (
+              <Lock className="w-5 h-5 text-gray-400" />
+            )}
+          </button>
         </div>
         
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Chapters</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {totalStats.completedChapters}/{totalStats.totalChapters}
+        {/* Analytics View */}
+        {settings.parentModeEnabled ? (
+          <DetailedAnalytics
+            chapters={chapters}
+            assignments={chapterAssignments}
+            exams={exams}
+            activitySessions={activitySessions || []}
+            dailyLogs={dailyLogs}
+            currentStreak={currentStreak}
+            level={level}
+          />
+        ) : (
+          <SimpleAnalytics
+            chapters={chapters}
+            assignments={chapterAssignments}
+            exams={exams}
+            currentStreak={currentStreak}
+            level={level}
+          />
+        )}
+        
+        {/* PIN Entry Dialog */}
+        {showPinDialog && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-96">
+              <h3 className="text-lg font-bold mb-4">Enter Parent PIN</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Please enter the PIN to access detailed analytics.
               </p>
-            </div>
-            <BookOpen className="text-green-500" size={32} />
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Hours Studied</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {totalStats.completedHours.toFixed(1)}h
-              </p>
-            </div>
-            <Clock className="text-blue-500" size={32} />
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Hours Left</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {(totalStats.totalHours - totalStats.completedHours).toFixed(1)}h
-              </p>
-            </div>
-            <Target className="text-orange-500" size={32} />
-          </div>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Weekly Study Hours</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={weeklyData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="planned" fill="#94a3b8" name="Planned" />
-              <Bar dataKey="actual" fill="#3b82f6" name="Actual" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Chapter Status</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={chapterStatusData}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, value }) => `${name}: ${value}`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="value"
-              >
-                {chapterStatusData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-      
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Subject Progress</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={subjectProgressData} layout="horizontal">
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis type="number" />
-            <YAxis dataKey="subject" type="category" />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="completed" stackId="a" fill="#10b981" name="Completed Hours" />
-            <Bar dataKey="remaining" stackId="a" fill="#e5e7eb" name="Remaining Hours" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      
-      {subjectProgressData.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">Subject Completion</h3>
-          <div className="space-y-4">
-            {subjectProgressData.map((subject) => (
-              <div key={subject.subject}>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm font-medium">{subject.subject}</span>
-                  <span className="text-sm text-gray-600">{subject.percentage}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${subject.percentage}%` }}
-                  />
-                </div>
+              <input
+                type="password"
+                value={enteredPin}
+                onChange={(e) => {
+                  setEnteredPin(e.target.value);
+                  setPinError(false);
+                }}
+                onKeyPress={(e) => e.key === 'Enter' && handlePinSubmit()}
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 ${
+                  pinError 
+                    ? 'border-red-500 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500'
+                }`}
+                placeholder="Enter 4-digit PIN"
+                maxLength={4}
+              />
+              {pinError && (
+                <p className="text-red-500 text-xs mt-1">Incorrect PIN. Please try again.</p>
+              )}
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={() => setShowPinDialog(false)}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePinSubmit}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Confirm
+                </button>
               </div>
-            ))}
+              <p className="text-xs text-gray-500 mt-3 text-center">
+                Default PIN: 1234 (Change in Settings)
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

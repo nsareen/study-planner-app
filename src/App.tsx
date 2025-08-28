@@ -41,7 +41,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
+            <Route index element={<Navigate to="/today" replace />} />
             <Route path="today" element={<TodayPlan />} />
             <Route path="subjects" element={<Subjects />} />
             <Route path="calendar" element={<Calendar />} />

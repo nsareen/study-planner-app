@@ -147,6 +147,8 @@ export interface AppSettings {
   studySessionMinutes: number;
   theme: 'light' | 'dark' | 'system';
   colorTheme: string;
+  parentModeEnabled?: boolean;
+  parentModePIN?: string;
 }
 
 export interface UserProfile {
@@ -268,6 +270,48 @@ export interface SubjectConfig {
   icon?: string;
 }
 
+// Activity Planning & Tracking Types
+export interface ChapterAssignment {
+  id: string;
+  chapterId: string;
+  date: string;
+  activityType: 'study' | 'revision';
+  plannedMinutes: number;
+  actualMinutes?: number;
+  status: 'scheduled' | 'in-progress' | 'paused' | 'completed';
+  startTime?: string;
+  endTime?: string;
+  pausedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+}
+
+export interface ActivitySession {
+  sessionId: string;
+  assignmentId: string;
+  chapterId: string;
+  startTime: string;
+  endTime?: string;
+  duration: number; // minutes
+  pausedIntervals: Array<{
+    pausedAt: string;
+    resumedAt?: string;
+    duration?: number;
+  }>;
+  isActive: boolean;
+  date: string;
+}
+
+export interface TimerState {
+  isRunning: boolean;
+  isPaused: boolean;
+  elapsedTime: number; // seconds
+  plannedTime: number; // seconds
+  overtimeAllowed: boolean;
+  warningShown: boolean;
+  completionAlertShown: boolean;
+}
+
 export interface AppState {
   currentUserId: string | null;
   users: UserProfile[];
@@ -284,6 +328,9 @@ export interface AppState {
       subjectConfigs?: SubjectConfig[]; // New
       historicalPerformance?: HistoricalPerformance; // Historical performance tracking
       plannerDays: PlannerDay[]; // Calendar tasks and planning data
+      chapterAssignments: ChapterAssignment[]; // NEW: Scheduled activities
+      activitySessions: ActivitySession[]; // NEW: Activity history
+      activeTimer?: TimerState; // NEW: Current timer state
     };
   };
   currentDate: string;

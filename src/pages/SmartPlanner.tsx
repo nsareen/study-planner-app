@@ -1,55 +1,35 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { useSearchParams } from 'react-router-dom';
 import { 
   Calendar, Clock, BookOpen, Target, 
-  CheckCircle, Play, Pause, RotateCcw, Zap, Brain, Award,
-  ChevronLeft, ChevronRight, X, HelpCircle, Grid3x3, CalendarDays, Edit2
+  HelpCircle, CalendarDays
 } from 'lucide-react';
-import type { Chapter, PlannerDay, PlannerTask } from '../types';
-import { format, addDays, differenceInDays, startOfDay, isSameDay, isWeekend } from 'date-fns';
+import type { Chapter, PlannerDay } from '../types';
+import { format, addDays, startOfDay, isSameDay, isWeekend } from 'date-fns';
 import PlannerTutorial from '../components/PlannerTutorial';
 import MatrixPlannerView from '../components/MatrixPlannerView';
-import QuickActionsToolbar from '../components/QuickActionsToolbar';
-import StudyPlanManager from '../components/StudyPlanManager';
 import EnhancedMatrixEditor from '../components/EnhancedMatrixEditor';
-import FlexibleCalendar from '../components/Calendar/FlexibleCalendar';
-import DailyProgress from '../components/DailyProgress';
-import MetricsComparison from '../components/MetricsComparison';
+import StudyPlanManager from '../components/StudyPlanManager';
 
 const SmartPlanner: React.FC = () => {
-  const [searchParams] = useSearchParams();
   const { 
     chapters, exams, examGroups, offDays, studyPlans, activeStudyPlanId, plannerDays,
+    chapterAssignments, activitySessions,
     addExam, addChapter, updateChapter, deleteChapter, 
     addStudyPlan, updateStudyPlan, deleteStudyPlan, setActiveStudyPlan, duplicateStudyPlan,
-    addPlannerDay, updatePlannerDay, deletePlannerDay, addTaskToPlannerDay, 
-    removeTaskFromPlannerDay, updatePlannerTask, getPlannerDayByDate
+    addPlannerDay, getPlannerDayByDate,
+    scheduleChapter, getAssignmentsForDate, deleteAssignment,
+    startActivity, pauseActivity, resumeActivity, completeActivity, getActiveSession
   } = useStore();
   
-  // Get view from URL param if provided
-  const viewParam = searchParams.get('view') as 'week' | 'month' | 'list' | 'matrix' | 'plans' | 'editor' | null;
-  
+  // Simplified to 3 essential tabs
+  const [selectedView, setSelectedView] = useState<'overview' | 'chapters' | 'schedule'>('overview');
   const [selectedExam, setSelectedExam] = useState<string>('');
-  const [currentWeekStart, setCurrentWeekStart] = useState(startOfDay(new Date()));
-  const [draggedChapter, setDraggedChapter] = useState<Chapter | null>(null);
-  const [draggedTaskType, setDraggedTaskType] = useState<'study' | 'revision'>('study');
-  const [activeTask, setActiveTask] = useState<PlannerTask | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [selectedView, setSelectedView] = useState<'week' | 'month' | 'list' | 'matrix' | 'plans' | 'editor' | 'progress' | 'metrics'>(viewParam || 'plans');
   const [showTutorial, setShowTutorial] = useState(false);
-  const [subjectDefaults] = useState<Map<string, { study: number; revision: number }>>(new Map());
-  const [selectedChapterIds, setSelectedChapterIds] = useState<string[]>([]);
-  const [showQuickActions, setShowQuickActions] = useState(true);
-  const [currentStudyPlan, setCurrentStudyPlan] = useState<any>(null);
-  
-  const timerInterval = useRef<number | null>(null);
   
   // Add sample exams if none exist
   useEffect(() => {
     if (exams.length === 0) {
-      // Add sample exams for demonstration
       const today = new Date();
       addExam({
         name: 'Mid-Term Mathematics',
@@ -63,212 +43,87 @@ const SmartPlanner: React.FC = () => {
         type: 'quarterly',
         subjects: ['Mathematics', 'Physics', 'Chemistry', 'Biology']
       });
-      addExam({
-        name: 'Weekly Test - Science',
-        date: addDays(today, 7).toISOString(),
-        type: 'weekly',
-        subjects: ['Physics', 'Chemistry']
-      });
     }
   }, [exams.length, addExam]);
 
-  // Initialize planner days - generate for next 30 days always
+  // Initialize planner days
   useEffect(() => {
     const today = startOfDay(new Date());
-    let endDate = addDays(today, 30); // Default to next 30 days
+    const endDate = addDays(today, 30);
     
-    if (selectedExam && exams.length > 0) {
-      const exam = exams.find(e => e.id === selectedExam);
-      if (exam) {
-        // Extend end date to exam date if it's further than 30 days
-        const examDate = new Date(exam.date);
-        if (examDate > endDate) {
-          endDate = examDate;
+    for (let d = today; d <= endDate; d = addDays(d, 1)) {
+      const existing = getPlannerDayByDate(d.toISOString());
+      if (!existing) {
+        const isOffDay = offDays.some(off => isSameDay(new Date(off.date), d));
+        const isExamDay = exams.some(exam => isSameDay(new Date(exam.date), d));
+        
+        let dayType: PlannerDay['dayType'] = 'study';
+        let availableHours = 4;
+        
+        if (isExamDay) {
+          dayType = 'exam';
+          availableHours = 2;
+        } else if (isOffDay) {
+          dayType = 'off';
+          availableHours = 0;
+        } else if (isWeekend(d)) {
+          dayType = 'weekend';
+          availableHours = 6;
         }
+        
+        addPlannerDay({
+          date: d.toISOString(),
+          dayType,
+          availableHours,
+          plannedTasks: [],
+          actualTimeSpent: 0
+        } as any);
       }
     }
-    
-    // Only generate if we don't have planner days for this range
-    const existingDays = plannerDays.filter(day => {
-      const dayDate = new Date(day.date);
-      return dayDate >= today && dayDate <= endDate;
-    });
-    
-    if (existingDays.length === 0) {
-      const days = generatePlannerDays(today, endDate);
-      // Add each day to the store
-      days.forEach(day => {
-        const existing = getPlannerDayByDate(day.date);
-        if (!existing) {
-          addPlannerDay(day);
-        }
-      });
-    }
-  }, [selectedExam, exams, offDays, plannerDays, addPlannerDay, getPlannerDayByDate]);
+  }, [exams, offDays, addPlannerDay, getPlannerDayByDate]);
 
-  // Timer effect
-  useEffect(() => {
-    if (isTimerRunning && activeTask) {
-      timerInterval.current = window.setInterval(() => {
-        setElapsedTime(prev => prev + 1);
-      }, 1000);
-    } else if (timerInterval.current) {
-      window.clearInterval(timerInterval.current);
-    }
-    return () => {
-      if (timerInterval.current) window.clearInterval(timerInterval.current);
-    };
-  }, [isTimerRunning, activeTask]);
-
-  const generatePlannerDays = (startDate: Date, endDate: Date): PlannerDay[] => {
-    const days: PlannerDay[] = [];
-    let currentDate = startOfDay(startDate);
-    
-    while (currentDate <= endDate) {
-      const isOffDay = offDays.some(off => isSameDay(new Date(off.date), currentDate));
-      const isExamDay = exams.some(exam => isSameDay(new Date(exam.date), currentDate));
-      
-      let dayType: PlannerDay['dayType'] = 'study';
-      let availableHours = 4; // Default study hours
-      
-      if (isExamDay) {
-        dayType = 'exam';
-        availableHours = 2; // Less time on exam day
-      } else if (isOffDay) {
-        dayType = 'off';
-        availableHours = 0;
-      } else if (isWeekend(currentDate)) {
-        dayType = 'weekend';
-        availableHours = 6; // More time on weekends
-      } else if (differenceInDays(new Date(endDate), currentDate) <= 3) {
-        dayType = 'revision';
-        availableHours = 5; // More time for revision days
-      }
-      
-      days.push({
-        id: `day-${currentDate.getTime()}`,
-        date: currentDate.toISOString(),
-        dayType,
-        availableHours,
-        plannedTasks: [],
-        actualTimeSpent: 0
-      });
-      
-      currentDate = addDays(currentDate, 1);
-    }
-    
-    return days;
+  // Calculate stats
+  const stats = {
+    totalChapters: chapters.length,
+    completedChapters: chapters.filter(c => c.studyStatus === 'done' && c.revisionStatus === 'done').length,
+    totalStudyHours: chapters.reduce((sum, c) => sum + (c.studyHours || 0), 0),
+    totalRevisionHours: chapters.reduce((sum, c) => sum + (c.revisionHours || 0), 0),
+    completedStudyHours: chapters.reduce((sum, c) => sum + (c.completedStudyHours || 0), 0),
+    completedRevisionHours: chapters.reduce((sum, c) => sum + (c.completedRevisionHours || 0), 0),
   };
+  
+  const progressPercentage = stats.totalChapters > 0 
+    ? Math.round((stats.completedChapters / stats.totalChapters) * 100)
+    : 0;
 
-  const handleDragStart = (chapter: Chapter, taskType: 'study' | 'revision') => {
-    setDraggedChapter(chapter);
-    setDraggedTaskType(taskType);
-  };
+  // Get next exam
+  const nextExam = exams
+    .filter(e => new Date(e.date) > new Date())
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+  
+  const daysUntilExam = nextExam 
+    ? Math.ceil((new Date(nextExam.date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+    : null;
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, day: PlannerDay) => {
-    e.preventDefault();
-    
-    // Handle both drag-and-drop and date picker modal
-    let chapter: Chapter | null = draggedChapter;
-    let taskType: 'study' | 'revision' = draggedTaskType;
-    
-    // Check if this is from the date picker modal
-    if (!chapter && e.dataTransfer?.getData) {
-      try {
-        const data = JSON.parse(e.dataTransfer.getData('text/plain') || '{}');
-        if (data.chapter && data.type) {
-          chapter = data.chapter;
-          taskType = data.type;
-        }
-      } catch (err) {
-        console.error('Failed to parse drop data:', err);
-      }
-    }
-    
-    if (!chapter) return;
-    
-    const defaultHours = subjectDefaults.get(chapter.subject) || { study: 2, revision: 1 };
-    const plannedMinutes = taskType === 'study' 
-      ? (chapter.studyHours || defaultHours.study) * 60
-      : (chapter.revisionHours || defaultHours.revision) * 60;
-    
-    const newTask: PlannerTask = {
-      id: `task-${Date.now()}`,
-      chapterId: chapter.id,
-      subject: chapter.subject,
-      chapterName: chapter.name,
-      taskType: taskType,
-      plannedMinutes,
-      status: 'scheduled',
-      confidence: chapter.confidence || 'medium'
-    };
-    
-    // Add task to the planner day
-    const existingDay = plannerDays.find(d => d.id === day.id);
-    if (existingDay) {
-      addTaskToPlannerDay(existingDay.id, newTask);
-    } else {
-      // If day doesn't exist in store, create it first
-      const newDay: Omit<PlannerDay, 'id'> = {
-        date: day.date,
-        dayType: day.dayType,
-        availableHours: day.availableHours,
-        plannedTasks: [newTask],
-        actualTimeSpent: 0
-      };
-      addPlannerDay(newDay);
-    }
-    
-    setDraggedChapter(null);
-  };
-
-  const removeTask = (dayId: string, taskId: string) => {
-    removeTaskFromPlannerDay(dayId, taskId);
-  };
-
-  // Handler for updating chapter hours in Matrix view
-  const handleUpdateChapterHours = (chapterId: string, studyHours: number, revisionHours: number) => {
-    updateChapter(chapterId, {
-      studyHours,
-      revisionHours,
-    });
-  };
-
-  // Handler for deleting a chapter
   const handleDeleteChapter = (chapterId: string) => {
-    deleteChapter(chapterId);
+    if (confirm('Are you sure you want to delete this chapter?')) {
+      deleteChapter(chapterId);
+    }
   };
 
-  // Handler for resetting a chapter
-  const handleResetChapter = (chapterId: string) => {
-    updateChapter(chapterId, {
-      studyStatus: 'not-done',
-      revisionStatus: 'not-done',
-      completedStudyHours: 0,
-      completedRevisionHours: 0,
-      status: 'not_started',
-    });
-  };
-
-  // Handler for deleting all chapters of a subject
   const handleDeleteSubject = (subject: string) => {
     const subjectChapters = chapters.filter(c => c.subject === subject);
-    subjectChapters.forEach(chapter => {
-      deleteChapter(chapter.id);
-    });
+    if (confirm(`Delete all ${subjectChapters.length} chapters in ${subject}?`)) {
+      subjectChapters.forEach(c => deleteChapter(c.id));
+    }
   };
 
-  // Handler for adding a new subject
   const handleAddSubject = (subjectName: string) => {
-    // Add a default first chapter when creating a new subject
+    // Create a placeholder chapter for the new subject
     addChapter({
       subject: subjectName,
-      name: 'Chapter 1',
-      estimatedHours: 3,
+      name: 'Introduction',
+      estimatedHours: 2,
       studyHours: 2,
       revisionHours: 1,
       completedStudyHours: 0,
@@ -278,224 +133,29 @@ const SmartPlanner: React.FC = () => {
     });
   };
 
-  // Handler for bulk chapter updates
   const handleBulkUpdate = (chapterIds: string[], updates: Partial<Chapter>) => {
-    chapterIds.forEach(id => {
-      updateChapter(id, updates);
-    });
-  };
-
-  // Handler for reordering chapters (placeholder for now)
-  const handleReorderChapters = (subject: string, newOrder: string[]) => {
-    console.log('Reorder not yet implemented:', subject, newOrder);
-  };
-
-  const startTask = (task: PlannerTask) => {
-    setActiveTask(task);
-    setElapsedTime(0);
-    setIsTimerRunning(true);
-    
-    // Update task status
-    const dayWithTask = plannerDays.find(day => 
-      day.plannedTasks.some(t => t.id === task.id)
-    );
-    
-    if (dayWithTask) {
-      updatePlannerTask(dayWithTask.id, task.id, { status: 'in-progress' as const });
-    }
-  };
-
-  const pauseTask = () => {
-    setIsTimerRunning(false);
-  };
-
-  const completeTask = () => {
-    if (!activeTask) return;
-    
-    // Find the day containing the active task
-    const dayWithTask = plannerDays.find(day => 
-      day.plannedTasks.some(t => t.id === activeTask.id)
-    );
-    
-    if (dayWithTask) {
-      updatePlannerTask(dayWithTask.id, activeTask.id, { 
-        status: 'completed' as const, 
-        actualMinutes: Math.floor(elapsedTime / 60) 
-      });
-    }
-    
-    setActiveTask(null);
-    setElapsedTime(0);
-    setIsTimerRunning(false);
-  };
-
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getChapterStats = () => {
-    const stats = {
-      totalChapters: chapters.length,
-      studyNotDone: chapters.filter(c => !c.studyStatus || c.studyStatus === 'not-done').length,
-      studyInProgress: chapters.filter(c => c.studyStatus === 'in-progress').length,
-      studyDone: chapters.filter(c => c.studyStatus === 'done').length,
-      revisionNotDone: chapters.filter(c => !c.revisionStatus || c.revisionStatus === 'not-done').length,
-      revisionInProgress: chapters.filter(c => c.revisionStatus === 'in-progress').length,
-      revisionDone: chapters.filter(c => c.revisionStatus === 'done').length,
-      totalStudyHours: chapters.reduce((sum, c) => sum + (c.studyHours || c.estimatedHours || 2), 0),
-      totalRevisionHours: chapters.reduce((sum, c) => sum + (c.revisionHours || c.estimatedHours * 0.5 || 1), 0),
-      completedStudyHours: chapters.reduce((sum, c) => sum + (c.completedStudyHours || 0), 0),
-      completedRevisionHours: chapters.reduce((sum, c) => sum + (c.completedRevisionHours || 0), 0)
-    };
-    return stats;
-  };
-
-  const stats = getChapterStats();
-  const progressPercentage = chapters.length > 0 
-    ? Math.round(((stats.studyDone + stats.revisionDone) / (stats.totalChapters * 2)) * 100)
-    : 0;
-
-  // Group chapters by subject
-  const chaptersBySubject = chapters.reduce((acc, chapter) => {
-    if (!acc[chapter.subject]) {
-      acc[chapter.subject] = [];
-    }
-    acc[chapter.subject].push(chapter);
-    return acc;
-  }, {} as Record<string, Chapter[]>);
-
-  // Bulk operation handlers for QuickActionsToolbar
-  const handleSetAllHours = (studyHours: number, revisionHours: number) => {
-    const chaptersToUpdate = selectedChapterIds.length > 0 
-      ? chapters.filter(c => selectedChapterIds.includes(c.id))
-      : chapters;
-    
-    chaptersToUpdate.forEach(chapter => {
-      updateChapter(chapter.id, { studyHours, revisionHours });
-    });
-    
-    // Clear selection after bulk update
-    setSelectedChapterIds([]);
-  };
-
-  const handleApplyTemplate = (templateId: string) => {
-    const SUBJECT_TEMPLATES: Record<string, Record<string, { study: number; revision: number }>> = {
-      math: { Mathematics: { study: 3, revision: 2 } },
-      science: { 
-        Physics: { study: 2.5, revision: 1.5 }, 
-        Chemistry: { study: 2.5, revision: 1.5 }, 
-        Biology: { study: 2, revision: 1 }
-      },
-      languages: { 
-        English: { study: 1.5, revision: 1 }, 
-        Hindi: { study: 1.5, revision: 1 }
-      },
-      social: { 
-        'History & Civics': { study: 2, revision: 1.5 }, 
-        Geography: { study: 2, revision: 1 }
-      }
-    };
-
-    const template = SUBJECT_TEMPLATES[templateId];
-    if (template) {
-      Object.entries(template).forEach(([subject, hours]) => {
-        const subjectChapters = chapters.filter(c => c.subject === subject);
-        subjectChapters.forEach(chapter => {
-          updateChapter(chapter.id, { 
-            studyHours: hours.study, 
-            revisionHours: hours.revision 
-          });
-        });
-      });
-    }
-  };
-
-  const handleBulkDelete = () => {
-    if (selectedChapterIds.length > 0) {
-      if (window.confirm(`Delete ${selectedChapterIds.length} selected chapters?`)) {
-        selectedChapterIds.forEach(id => deleteChapter(id));
-        setSelectedChapterIds([]);
-      }
-    }
-  };
-
-  const handleRecalibrate = () => {
-    // Trigger recalculation of all metrics and plans
-    const endDate = selectedExam ? exams.find(e => e.id === selectedExam)?.date : addDays(new Date(), 30).toISOString();
-    if (endDate) {
-      const newPlan = generatePlannerDays(new Date(), new Date(endDate));
-      // Clear existing planner days and add new ones
-      plannerDays.forEach(day => deletePlannerDay(day.id));
-      newPlan.forEach(day => {
-        const dayToAdd = { ...day };
-        delete (dayToAdd as any).id; // Remove id so store generates it
-        addPlannerDay(dayToAdd);
-      });
-    }
-  };
-
-  const handleExportData = () => {
-    const exportData = {
-      chapters: chapters,
-      selectedChapterIds: selectedChapterIds,
-      studyPlan: plannerDays,
-      exportDate: new Date().toISOString()
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `study-plan-${format(new Date(), 'yyyy-MM-dd')}.json`;
-    link.click();
-  };
-
-  const handleImportData = (data: any) => {
-    if (data.chapters) {
-      // This would need to be implemented in the store
-      console.log('Importing chapters:', data.chapters);
-      alert('Import functionality will be implemented soon!');
-    }
-  };
-
-  const handleSelectAll = () => {
-    setSelectedChapterIds(chapters.map(c => c.id));
-  };
-
-  const handleClearSelection = () => {
-    setSelectedChapterIds([]);
-  };
-
-  const toggleChapterSelection = (chapterId: string) => {
-    setSelectedChapterIds(prev => 
-      prev.includes(chapterId)
-        ? prev.filter(id => id !== chapterId)
-        : [...prev, chapterId]
-    );
+    chapterIds.forEach(id => updateChapter(id, updates));
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-      <div className="max-w-7xl mx-auto p-6">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-50">
+      <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
-        <div className="bg-white rounded-3xl shadow-xl p-6 mb-6">
+        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">
                 Smart Study Planner
               </h1>
-              <p className="text-gray-600 mt-1">Intelligent exam preparation with adaptive scheduling</p>
+              <p className="text-gray-600">Intelligent exam preparation with adaptive scheduling</p>
             </div>
             <div className="flex items-center gap-3">
-              <Brain className="w-8 h-8 text-purple-500 animate-pulse" />
-              <Zap className="w-8 h-8 text-yellow-500" />
+              <Clock className="w-8 h-8 text-purple-500 animate-pulse" />
+              <Target className="w-8 h-8 text-yellow-500" />
             </div>
           </div>
 
-          {/* Exam Selection */}
+          {/* Simplified Tab Navigation - Only 3 Essential Tabs */}
           <div className="flex items-center gap-4">
             <select
               value={selectedExam}
@@ -512,79 +172,37 @@ const SmartPlanner: React.FC = () => {
             
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSelectedView('plans')}
+                onClick={() => setSelectedView('overview')}
                 className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                  selectedView === 'plans' 
+                  selectedView === 'overview' 
                     ? 'bg-purple-500 text-white' 
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
                 <CalendarDays size={18} />
-                Plans
+                Overview
               </button>
               <button
-                onClick={() => setSelectedView('matrix')}
+                onClick={() => setSelectedView('chapters')}
                 className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                  selectedView === 'matrix' 
+                  selectedView === 'chapters' 
                     ? 'bg-purple-500 text-white' 
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                <Grid3x3 size={18} />
-                Matrix
+                <BookOpen size={18} />
+                Chapters
               </button>
               <button
-                onClick={() => setSelectedView('progress')}
+                onClick={() => setSelectedView('schedule')}
                 className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                  selectedView === 'progress' 
+                  selectedView === 'schedule' 
                     ? 'bg-purple-500 text-white' 
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                <Target size={18} />
-                Progress
-              </button>
-              <button
-                onClick={() => setSelectedView('metrics')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                  selectedView === 'metrics' 
-                    ? 'bg-purple-500 text-white' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <Zap size={18} />
-                Metrics
-              </button>
-              <button
-                onClick={() => setSelectedView('editor')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
-                  selectedView === 'editor' 
-                    ? 'bg-purple-500 text-white' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <Edit2 size={18} />
-                Editor
-              </button>
-              <button
-                onClick={() => setSelectedView('week')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  selectedView === 'week' 
-                    ? 'bg-purple-500 text-white' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Week
-              </button>
-              <button
-                onClick={() => setSelectedView('list')}
-                className={`px-4 py-2 rounded-lg font-semibold transition-all ${
-                  selectedView === 'list' 
-                    ? 'bg-purple-500 text-white' 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                List
+                <Calendar size={18} />
+                Schedule
               </button>
               <button
                 onClick={() => setShowTutorial(true)}
@@ -597,7 +215,7 @@ const SmartPlanner: React.FC = () => {
           </div>
         </div>
 
-        {/* Overall Progress Stats */}
+        {/* Quick Stats Summary - Always Visible */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-2xl shadow-lg p-4">
             <div className="flex items-center justify-between mb-2">
@@ -605,9 +223,8 @@ const SmartPlanner: React.FC = () => {
               <span className="text-2xl font-bold text-gray-800">{stats.totalChapters}</span>
             </div>
             <p className="text-sm text-gray-600">Total Chapters</p>
-            <div className="mt-2 text-xs">
-              <span className="text-green-600">✓ {stats.studyDone} studied</span>
-              <span className="text-orange-500 ml-2">⟲ {stats.studyInProgress} in progress</span>
+            <div className="mt-2 text-xs text-green-600">
+              ✓ {stats.completedChapters} completed
             </div>
           </div>
 
@@ -615,7 +232,7 @@ const SmartPlanner: React.FC = () => {
             <div className="flex items-center justify-between mb-2">
               <Clock className="w-6 h-6 text-purple-500" />
               <span className="text-2xl font-bold text-gray-800">
-                {stats.totalStudyHours}h
+                {Math.round(stats.totalStudyHours)}h
               </span>
             </div>
             <p className="text-sm text-gray-600">Study Hours Needed</p>
@@ -623,29 +240,10 @@ const SmartPlanner: React.FC = () => {
               <div className="h-2 bg-gray-200 rounded-full">
                 <div 
                   className="h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full"
-                  style={{ width: `${(stats.completedStudyHours / stats.totalStudyHours) * 100}%` }}
+                  style={{ width: `${Math.min(100, (stats.completedStudyHours / stats.totalStudyHours) * 100)}%` }}
                 />
               </div>
-              <span className="text-xs text-gray-500">{stats.completedStudyHours}h completed</span>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <RotateCcw className="w-6 h-6 text-green-500" />
-              <span className="text-2xl font-bold text-gray-800">
-                {stats.totalRevisionHours}h
-              </span>
-            </div>
-            <p className="text-sm text-gray-600">Revision Hours</p>
-            <div className="mt-2">
-              <div className="h-2 bg-gray-200 rounded-full">
-                <div 
-                  className="h-2 bg-gradient-to-r from-green-500 to-teal-500 rounded-full"
-                  style={{ width: `${(stats.completedRevisionHours / stats.totalRevisionHours) * 100}%` }}
-                />
-              </div>
-              <span className="text-xs text-gray-500">{stats.completedRevisionHours}h completed</span>
+              <span className="text-xs text-gray-500">{Math.round(stats.completedStudyHours)}h completed</span>
             </div>
           </div>
 
@@ -667,405 +265,99 @@ const SmartPlanner: React.FC = () => {
               <span className="text-xs text-gray-500">Keep going! 💪</span>
             </div>
           </div>
+
+          {nextExam && (
+            <div className="bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl shadow-lg p-4 text-white">
+              <div className="flex items-center justify-between mb-2">
+                <Calendar className="w-6 h-6" />
+                <span className="text-2xl font-bold">
+                  {daysUntilExam}
+                </span>
+              </div>
+              <p className="text-sm">Days Until Exam</p>
+              <p className="text-xs mt-1 opacity-90">{nextExam.name}</p>
+            </div>
+          )}
         </div>
 
-        {/* Active Task Timer */}
-        {activeTask && (
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl shadow-xl p-6 mb-6 text-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold mb-1">Currently Studying</h3>
-                <p className="text-2xl font-bold">{activeTask.chapterName}</p>
-                <p className="text-sm opacity-90">{activeTask.subject} • {activeTask.taskType === 'study' ? '📖 Study' : '🔄 Revision'}</p>
-              </div>
-              <div className="text-center">
-                <div className="text-4xl font-mono font-bold mb-2">
-                  {formatTime(elapsedTime)}
-                </div>
-                <div className="flex items-center gap-2">
-                  {isTimerRunning ? (
-                    <button
-                      onClick={pauseTask}
-                      className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg flex items-center gap-2"
-                    >
-                      <Pause size={20} />
-                      Pause
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setIsTimerRunning(true)}
-                      className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg flex items-center gap-2"
-                    >
-                      <Play size={20} />
-                      Resume
-                    </button>
-                  )}
-                  <button
-                    onClick={completeTask}
-                    className="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg flex items-center gap-2"
-                  >
-                    <CheckCircle size={20} />
-                    Complete
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Actions Toolbar - Show only in matrix view */}
-        {selectedView === 'matrix' && showQuickActions && (
-          <QuickActionsToolbar
-            onSetAllHours={handleSetAllHours}
-            onApplyTemplate={handleApplyTemplate}
-            onBulkDelete={handleBulkDelete}
-            onRecalibrate={handleRecalibrate}
-            onExport={handleExportData}
-            onImport={handleImportData}
-            totalChapters={chapters.length}
-            selectedChapters={selectedChapterIds}
-            onSelectAll={handleSelectAll}
-            onClearSelection={handleClearSelection}
-          />
-        )}
-
-        {/* Main Content Area */}
-        {selectedView === 'plans' ? (
-          <StudyPlanManager
-            plans={studyPlans || []}
-            activeStudyPlanId={activeStudyPlanId}
-            examGroups={examGroups || []}
-            onCreatePlan={(plan) => addStudyPlan(plan)}
-            onUpdatePlan={(id, updates) => updateStudyPlan(id, updates)}
-            onDeletePlan={(id) => deleteStudyPlan(id)}
-            onSetActivePlan={(id) => setActiveStudyPlan(id)}
-            onDuplicatePlan={(id) => {
-              const plan = studyPlans?.find(p => p.id === id);
-              if (plan) {
-                duplicateStudyPlan(id, `${plan.name} (Copy)`);
-              }
-            }}
-            onOpenPlan={(plan) => {
-              setCurrentStudyPlan(plan);
-              setSelectedView('matrix');
-            }}
-          />
-        ) : selectedView === 'matrix' ? (
-          <MatrixPlannerView 
-            chapters={chapters}
-            plannerDays={plannerDays}
-            exams={exams}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onStartTask={startTask}
-            onUpdateChapterHours={handleUpdateChapterHours}
-            onUpdateChapterStatus={updateChapter}
-            onDeleteChapter={handleDeleteChapter}
-            onResetChapter={handleResetChapter}
-            onDeleteSubject={handleDeleteSubject}
-            selectedExamDate={selectedExam && exams.find(e => e.id === selectedExam) ? new Date(exams.find(e => e.id === selectedExam)!.date) : null}
-            selectedChapterIds={selectedChapterIds}
-            onToggleChapterSelection={toggleChapterSelection}
-          />
-        ) : selectedView === 'editor' ? (
-          <EnhancedMatrixEditor
-            chapters={chapters}
-            onUpdateChapter={updateChapter}
-            onAddChapter={addChapter}
-            onDeleteChapter={deleteChapter}
-            onAddSubject={handleAddSubject}
-            onDeleteSubject={handleDeleteSubject}
-            onBulkUpdate={handleBulkUpdate}
-            onReorderChapters={handleReorderChapters}
-          />
-        ) : selectedView === 'progress' ? (
-          <DailyProgress
-            chapters={chapters}
-            plannerDays={plannerDays}
-            currentDate={currentWeekStart}
-          />
-        ) : selectedView === 'metrics' ? (
-          <MetricsComparison
-            chapters={chapters}
-          />
-        ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Chapter Catalog (Draggable) */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-xl p-4 max-h-[600px] overflow-y-auto">
-              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-blue-500" />
-                Chapter Catalog
-              </h3>
-              
-              {Object.entries(chaptersBySubject).map(([subject, subjectChapters]) => (
-                <div key={subject} className="mb-4">
-                  <h4 className="font-semibold text-gray-700 mb-2">{subject}</h4>
-                  <div className="space-y-2">
-                    {subjectChapters.map(chapter => (
-                      <div
-                        key={chapter.id}
-                        className="border border-gray-200 rounded-lg p-2 cursor-move hover:shadow-md transition-shadow"
-                        draggable
-                        onDragStart={() => handleDragStart(chapter, 'study')}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-gray-800 truncate flex-1">
-                            {chapter.name}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            {chapter.studyStatus === 'done' && (
-                              <CheckCircle className="w-4 h-4 text-green-500" />
-                            )}
-                            {chapter.revisionStatus === 'done' && (
-                              <RotateCcw className="w-4 h-4 text-blue-500" />
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <button
-                            className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded hover:bg-blue-200"
-                            draggable
-                            onDragStart={(e) => {
-                              e.stopPropagation();
-                              handleDragStart(chapter, 'study');
-                            }}
-                          >
-                            📖 Study ({chapter.studyHours || 2}h)
-                          </button>
-                          <button
-                            className="text-xs bg-green-100 text-green-600 px-2 py-1 rounded hover:bg-green-200"
-                            draggable
-                            onDragStart={(e) => {
-                              e.stopPropagation();
-                              handleDragStart(chapter, 'revision');
-                            }}
-                          >
-                            🔄 Revise ({chapter.revisionHours || 1}h)
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Planner Calendar */}
-          <div className="lg:col-span-3">
-            <div className="bg-white rounded-2xl shadow-xl p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-purple-500" />
-                  Study Schedule
-                </h3>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setCurrentWeekStart(addDays(currentWeekStart, -7))}
-                    className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  <span className="text-sm font-medium text-gray-600">
-                    {format(currentWeekStart, 'MMM dd')} - {format(addDays(currentWeekStart, 6), 'MMM dd, yyyy')}
-                  </span>
-                  <button
-                    onClick={() => setCurrentWeekStart(addDays(currentWeekStart, 7))}
-                    className="p-2 hover:bg-gray-100 rounded-lg"
-                  >
-                    <ChevronRight size={20} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Week View */}
-              {selectedView === 'week' && (
-                <div className="grid grid-cols-7 gap-2">
-                  {Array.from({ length: 7 }, (_, i) => {
-                    const date = addDays(currentWeekStart, i);
-                    const day = plannerDays.find(d => isSameDay(new Date(d.date), date));
-                    
-                    return (
-                      <div
-                        key={i}
-                        className={`border rounded-lg p-2 min-h-[200px] ${
-                          day?.dayType === 'off' ? 'bg-gray-50' :
-                          day?.dayType === 'exam' ? 'bg-red-50' :
-                          day?.dayType === 'weekend' ? 'bg-blue-50' :
-                          day?.dayType === 'revision' ? 'bg-green-50' :
-                          'bg-white'
-                        }`}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => day && handleDrop(e, day)}
-                      >
-                        <div className="font-semibold text-sm text-gray-700 mb-1">
-                          {format(date, 'EEE')}
-                        </div>
-                        <div className="text-xs text-gray-500 mb-2">
-                          {format(date, 'MMM dd')}
-                        </div>
-                        
-                        {day && (
-                          <>
-                            <div className="text-xs text-gray-600 mb-2">
-                              {day.availableHours}h available
-                            </div>
-                            
-                            <div className="space-y-1">
-                              {day.plannedTasks.map(task => (
-                                <div
-                                  key={task.id}
-                                  className={`text-xs p-1 rounded ${
-                                    task.taskType === 'study' 
-                                      ? 'bg-blue-100 text-blue-700' 
-                                      : 'bg-green-100 text-green-700'
-                                  } ${
-                                    task.status === 'completed' ? 'opacity-50 line-through' : ''
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="truncate flex-1">
-                                      {task.taskType === 'study' ? '📖' : '🔄'} {task.chapterName}
-                                    </span>
-                                    <button
-                                      onClick={() => removeTask(day.id, task.id)}
-                                      className="ml-1 hover:text-red-500"
-                                    >
-                                      <X size={12} />
-                                    </button>
-                                  </div>
-                                  <div className="flex items-center justify-between mt-1">
-                                    <span className="text-[10px]">
-                                      {Math.floor(task.plannedMinutes / 60)}h {task.plannedMinutes % 60}m
-                                    </span>
-                                    {task.status === 'scheduled' && (
-                                      <button
-                                        onClick={() => startTask(task)}
-                                        className="hover:bg-blue-200 p-1 rounded"
-                                      >
-                                        <Play size={10} />
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* List View */}
-              {selectedView === 'list' && (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto">
-                  {plannerDays.map(day => (
-                    <div
-                      key={day.id}
-                      className={`border rounded-lg p-4 ${
-                        day.dayType === 'off' ? 'bg-gray-50' :
-                        day.dayType === 'exam' ? 'bg-red-50' :
-                        day.dayType === 'weekend' ? 'bg-blue-50' :
-                        day.dayType === 'revision' ? 'bg-green-50' :
-                        'bg-white'
-                      }`}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, day)}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="font-semibold text-gray-800">
-                            {format(new Date(day.date), 'EEEE, MMMM dd, yyyy')}
-                          </span>
-                          <span className={`ml-2 text-xs px-2 py-1 rounded ${
-                            day.dayType === 'exam' ? 'bg-red-200 text-red-700' :
-                            day.dayType === 'revision' ? 'bg-green-200 text-green-700' :
-                            day.dayType === 'weekend' ? 'bg-blue-200 text-blue-700' :
-                            day.dayType === 'off' ? 'bg-gray-200 text-gray-700' :
-                            'bg-purple-200 text-purple-700'
-                          }`}>
-                            {day.dayType.charAt(0).toUpperCase() + day.dayType.slice(1)}
-                          </span>
-                        </div>
-                        <span className="text-sm text-gray-600">
-                          {day.availableHours}h available • {day.plannedTasks.length} tasks
-                        </span>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {day.plannedTasks.map(task => (
-                          <div
-                            key={task.id}
-                            className={`border rounded-lg p-2 ${
-                              task.taskType === 'study' 
-                                ? 'bg-blue-50 border-blue-200' 
-                                : 'bg-green-50 border-green-200'
-                            } ${
-                              task.status === 'completed' ? 'opacity-50' : ''
-                            }`}
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-gray-800 truncate">
-                                {task.chapterName}
-                              </span>
-                              <button
-                                onClick={() => removeTask(day.id, task.id)}
-                                className="text-gray-400 hover:text-red-500"
-                              >
-                                <X size={14} />
-                              </button>
-                            </div>
-                            <div className="text-xs text-gray-600">
-                              {task.subject} • {task.taskType === 'study' ? '📖 Study' : '🔄 Revision'}
-                            </div>
-                            <div className="flex items-center justify-between mt-2">
-                              <span className="text-xs text-gray-500">
-                                {Math.floor(task.plannedMinutes / 60)}h {task.plannedMinutes % 60}m
-                              </span>
-                              {task.status === 'scheduled' && (
-                                <button
-                                  onClick={() => startTask(task)}
-                                  className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-                                >
-                                  Start
-                                </button>
-                              )}
-                              {task.status === 'completed' && (
-                                <span className="text-xs text-green-600">✓ Done</span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+        {/* Main Content Area - Based on Selected View */}
+        <div className="bg-white rounded-2xl shadow-xl p-6">
+          {selectedView === 'overview' ? (
+            <StudyPlanManager
+              plans={studyPlans || []}
+              activeStudyPlanId={activeStudyPlanId}
+              examGroups={examGroups || []}
+              onCreatePlan={(plan) => addStudyPlan(plan)}
+              onUpdatePlan={(id, updates) => updateStudyPlan(id, updates)}
+              onDeletePlan={(id) => deleteStudyPlan(id)}
+              onSetActivePlan={(id) => setActiveStudyPlan(id)}
+              onDuplicatePlan={(id) => {
+                const plan = studyPlans?.find(p => p.id === id);
+                if (plan) {
+                  duplicateStudyPlan(id, `${plan.name} (Copy)`);
+                }
+              }}
+              onOpenPlan={() => setSelectedView('schedule')}
+            />
+          ) : selectedView === 'chapters' ? (
+            <EnhancedMatrixEditor
+              chapters={chapters}
+              onUpdateChapter={updateChapter}
+              onAddChapter={addChapter}
+              onDeleteChapter={handleDeleteChapter}
+              onAddSubject={handleAddSubject}
+              onDeleteSubject={handleDeleteSubject}
+              onBulkUpdate={handleBulkUpdate}
+              onReorderChapters={(subject, newOrder) => {
+                // Handle reordering for a specific subject
+                console.log('Reordering chapters for', subject, newOrder);
+              }}
+            />
+          ) : (
+            <MatrixPlannerView 
+              chapters={chapters}
+              plannerDays={plannerDays}
+              exams={exams}
+              chapterAssignments={chapterAssignments}
+              activitySessions={activitySessions}
+              activeSession={getActiveSession()}
+              onDrop={(e) => {
+                // Handle drop functionality
+                e.preventDefault();
+              }}
+              onDragOver={(e) => e.preventDefault()}
+              onStartTask={() => {}}
+              onUpdateChapterHours={(chapterId, studyHours, revisionHours) => {
+                updateChapter(chapterId, { studyHours, revisionHours });
+              }}
+              onUpdateChapterStatus={updateChapter}
+              onDeleteChapter={handleDeleteChapter}
+              onResetChapter={(id) => {
+                updateChapter(id, {
+                  studyStatus: 'not-done',
+                  revisionStatus: 'not-done',
+                  completedStudyHours: 0,
+                  completedRevisionHours: 0
+                });
+              }}
+              onDeleteSubject={handleDeleteSubject}
+              onScheduleChapter={scheduleChapter}
+              getAssignmentsForDate={getAssignmentsForDate}
+              onStartActivity={startActivity}
+              onPauseActivity={pauseActivity}
+              onResumeActivity={resumeActivity}
+              onCompleteActivity={completeActivity}
+              onDeleteAssignment={deleteAssignment}
+              selectedExamDate={selectedExam && exams.find(e => e.id === selectedExam) ? new Date(exams.find(e => e.id === selectedExam)!.date) : null}
+              selectedChapterIds={[]}
+              onToggleChapterSelection={() => {}}
+            />
+          )}
         </div>
-        )}
 
-        {/* Motivational Section */}
-        <div className="mt-6 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl shadow-xl p-6 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-bold mb-2">You're doing great! 🌟</h3>
-              <p className="opacity-90">
-                {stats.studyDone} chapters studied, {stats.revisionDone} chapters revised. 
-                Keep up the momentum!
-              </p>
-            </div>
-            <Award className="w-16 h-16 text-yellow-300" />
-          </div>
-        </div>
-        
         {/* Tutorial Modal */}
         <PlannerTutorial 
-          isOpen={showTutorial}
+          isOpen={showTutorial} 
           onClose={() => setShowTutorial(false)}
         />
       </div>

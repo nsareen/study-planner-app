@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AppState, Exam, ExamGroup, OffDay, Chapter, DailyLog, AppSettings, DailyTask, UserProfile, StudyPlan, ChapterStatus, SubjectConfig, PerformanceMetric, HistoricalPerformance, PlannerDay, PlannerTask } from '../types';
+import type { AppState, Exam, ExamGroup, OffDay, Chapter, DailyLog, AppSettings, DailyTask, UserProfile, StudyPlan, ChapterStatus, SubjectConfig, PerformanceMetric, HistoricalPerformance, PlannerDay, PlannerTask, ChapterAssignment, ActivitySession, TimerState } from '../types';
+import { cleanupChapterData, cleanupStudyPlanData, prepareExportData, validateImportData, validateDataIntegrity } from './dataSync';
 
 interface StoreActions {
   // User actions
@@ -53,6 +54,24 @@ interface StoreActions {
   setActiveStudyPlan: (id: string) => void;
   duplicateStudyPlan: (id: string, newName: string) => void;
   
+  // Chapter Assignment actions (NEW)
+  scheduleChapter: (chapterId: string, date: string, activityType: 'study' | 'revision', plannedMinutes: number) => void;
+  updateAssignment: (id: string, updates: Partial<ChapterAssignment>) => void;
+  deleteAssignment: (id: string) => void;
+  getAssignmentsForDate: (date: string) => ChapterAssignment[];
+  getAssignmentsForChapter: (chapterId: string) => ChapterAssignment[];
+  
+  // Activity Session actions (NEW)
+  startActivity: (assignmentId: string) => void;
+  pauseActivity: (sessionId: string) => void;
+  resumeActivity: (sessionId: string) => void;
+  completeActivity: (sessionId: string, actualMinutes: number) => void;
+  getActiveSession: () => ActivitySession | undefined;
+  
+  // Timer actions (NEW)
+  updateTimerState: (updates: Partial<TimerState>) => void;
+  resetTimer: () => void;
+  
   // Settings actions
   updateSettings: (settings: Partial<AppSettings>) => void;
   
@@ -66,6 +85,8 @@ interface StoreActions {
   clearAllData: () => void;
   clearAllChapters: () => void;
   importData: (data: any) => boolean;
+  cleanupOrphanedData: () => void;
+  validateDataIntegrity: () => { isValid: boolean; issues: string[] };
   
   // Helper getters for current user data
   exams: Exam[];
@@ -77,6 +98,9 @@ interface StoreActions {
   studyPlans: StudyPlan[];
   activeStudyPlanId?: string;
   plannerDays: PlannerDay[];
+  chapterAssignments: ChapterAssignment[];
+  activitySessions: ActivitySession[];
+  activeTimer?: TimerState;
 }
 
 type Store = AppState & StoreActions;
@@ -87,6 +111,8 @@ const initialSettings: AppSettings = {
   studySessionMinutes: 45,
   theme: 'light',
   colorTheme: 'default',
+  parentModeEnabled: false,
+  parentModePIN: '1234',
 };
 
 // Pre-configured users for the students
@@ -165,6 +191,9 @@ export const useStore = create<Store>()(
           studyPlans: [],
           activeStudyPlanId: undefined,
           plannerDays: [],
+          chapterAssignments: [],
+          activitySessions: [],
+          activeTimer: undefined,
         }
       }), {});
       
@@ -185,6 +214,9 @@ export const useStore = create<Store>()(
       studyPlans: [],
       activeStudyPlanId: undefined,
       plannerDays: [],
+      chapterAssignments: [],
+      activitySessions: [],
+      activeTimer: undefined,
       
       // User actions
       addUser: (name, avatar, grade) => {
@@ -216,6 +248,9 @@ export const useStore = create<Store>()(
               studyPlans: [],
               activeStudyPlanId: undefined,
               plannerDays: [],
+              chapterAssignments: [],
+              activitySessions: [],
+              activeTimer: undefined,
             }
           }
         }));
@@ -236,6 +271,9 @@ export const useStore = create<Store>()(
           studyPlans: [],
           activeStudyPlanId: undefined,
           plannerDays: [],
+          chapterAssignments: [],
+          activitySessions: [],
+          activeTimer: undefined,
         };
         
         set({
@@ -249,6 +287,9 @@ export const useStore = create<Store>()(
           studyPlans: userData.studyPlans,
           activeStudyPlanId: userData.activeStudyPlanId,
           plannerDays: userData.plannerDays || [],
+          chapterAssignments: userData.chapterAssignments || [],
+          activitySessions: userData.activitySessions || [],
+          activeTimer: userData.activeTimer,
         });
         
         // Update last active
@@ -571,15 +612,29 @@ export const useStore = create<Store>()(
           
           const updatedChapters = state.chapters.filter((c) => c.id !== id);
           
+          // Clean up related data
+          const cleaned = cleanupChapterData(
+            id,
+            state.chapterAssignments,
+            state.activitySessions,
+            state.plannerDays
+          );
+          
           return {
             userData: {
               ...state.userData,
               [state.currentUserId]: {
                 ...state.userData[state.currentUserId],
                 chapters: updatedChapters,
+                chapterAssignments: cleaned.assignments,
+                activitySessions: cleaned.sessions,
+                plannerDays: cleaned.plannerDays,
               }
             },
             chapters: updatedChapters,
+            chapterAssignments: cleaned.assignments,
+            activitySessions: cleaned.sessions,
+            plannerDays: cleaned.plannerDays,
           };
         }),
         
@@ -880,18 +935,46 @@ export const useStore = create<Store>()(
           
           const updatedPlans = (state.studyPlans || []).filter((p) => p.id !== id);
           
+          // Clean up related data when deleting a plan
+          const cleaned = cleanupStudyPlanData(
+            id,
+            state.chapterAssignments,
+            state.activitySessions,
+            state.plannerDays
+          );
+          
+          // Reset all chapter progress if this was the active plan
+          const resetChapters = state.activeStudyPlanId === id 
+            ? state.chapters.map(c => ({
+                ...c,
+                studyStatus: 'not-done' as const,
+                revisionStatus: 'not-done' as const,
+                completedStudyHours: 0,
+                completedRevisionHours: 0,
+                actualStudyHours: 0,
+                actualRevisionHours: 0,
+              }))
+            : state.chapters;
+          
           return {
             userData: {
               ...state.userData,
               [state.currentUserId]: {
                 ...state.userData[state.currentUserId],
                 studyPlans: updatedPlans,
-                // Clear active plan if it was deleted
                 activeStudyPlanId: state.activeStudyPlanId === id ? undefined : state.activeStudyPlanId,
+                chapters: resetChapters,
+                chapterAssignments: cleaned.assignments,
+                activitySessions: cleaned.sessions,
+                plannerDays: cleaned.plannerDays,
               }
             },
             studyPlans: updatedPlans,
             activeStudyPlanId: state.activeStudyPlanId === id ? undefined : state.activeStudyPlanId,
+            chapters: resetChapters,
+            chapterAssignments: cleaned.assignments,
+            activitySessions: cleaned.sessions,
+            plannerDays: cleaned.plannerDays,
           };
         }),
         
@@ -931,6 +1014,358 @@ export const useStore = create<Store>()(
         const { id: _, createdAt, updatedAt, ...planWithoutId } = duplicatedPlan;
         get().addStudyPlan({ ...planWithoutId, name: newName });
       },
+      
+      // Chapter Assignment actions
+      scheduleChapter: (chapterId, date, activityType, plannedMinutes) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const assignment: ChapterAssignment = {
+            id: generateId(),
+            chapterId,
+            date,
+            activityType,
+            plannedMinutes,
+            status: 'scheduled',
+            createdAt: new Date().toISOString(),
+          };
+          
+          const updatedAssignments = [...(state.chapterAssignments || []), assignment];
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                chapterAssignments: updatedAssignments,
+              }
+            },
+            chapterAssignments: updatedAssignments,
+          };
+        }),
+        
+      updateAssignment: (id, updates) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const updatedAssignments = (state.chapterAssignments || []).map((assignment) =>
+            assignment.id === id ? { ...assignment, ...updates } : assignment
+          );
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                chapterAssignments: updatedAssignments,
+              }
+            },
+            chapterAssignments: updatedAssignments,
+          };
+        }),
+        
+      deleteAssignment: (id) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const updatedAssignments = (state.chapterAssignments || []).filter(
+            (assignment) => assignment.id !== id
+          );
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                chapterAssignments: updatedAssignments,
+              }
+            },
+            chapterAssignments: updatedAssignments,
+          };
+        }),
+        
+      getAssignmentsForDate: (date) => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return (state.chapterAssignments || []).filter(
+          (assignment) => assignment.date === date
+        );
+      },
+      
+      getAssignmentsForChapter: (chapterId) => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return (state.chapterAssignments || []).filter(
+          (assignment) => assignment.chapterId === chapterId
+        );
+      },
+      
+      // Activity Session actions
+      startActivity: (assignmentId) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          // Find the assignment
+          const assignment = state.chapterAssignments.find(a => a.id === assignmentId);
+          if (!assignment) return state;
+          
+          // Create new activity session
+          const newSession: ActivitySession = {
+            sessionId: generateId(),
+            assignmentId,
+            chapterId: assignment.chapterId,
+            startTime: new Date().toISOString(),
+            duration: 0,
+            pausedIntervals: [],
+            isActive: true,
+            date: assignment.date
+          };
+          
+          // Update assignment status to in-progress
+          const updatedAssignments = state.chapterAssignments.map(a =>
+            a.id === assignmentId ? { ...a, status: 'in-progress' as const, startTime: newSession.startTime } : a
+          );
+          
+          // Add session to activity sessions
+          const updatedSessions = [...(state.activitySessions || []), newSession];
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                chapterAssignments: updatedAssignments,
+                activitySessions: updatedSessions,
+                activeTimer: {
+                  isRunning: true,
+                  isPaused: false,
+                  elapsedTime: 0,
+                  plannedTime: assignment.plannedMinutes * 60,
+                  overtimeAllowed: true,
+                  warningShown: false,
+                  completionAlertShown: false
+                }
+              }
+            },
+            chapterAssignments: updatedAssignments,
+            activitySessions: updatedSessions,
+            activeTimer: {
+              isRunning: true,
+              isPaused: false,
+              elapsedTime: 0,
+              plannedTime: assignment.plannedMinutes * 60,
+              overtimeAllowed: true,
+              warningShown: false,
+              completionAlertShown: false
+            }
+          };
+        }),
+      
+      pauseActivity: (sessionId) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const session = state.activitySessions?.find(s => s.sessionId === sessionId);
+          if (!session || !session.isActive) return state;
+          
+          const pausedAt = new Date().toISOString();
+          
+          // Update session with paused interval
+          const updatedSessions = state.activitySessions.map(s =>
+            s.sessionId === sessionId
+              ? {
+                  ...s,
+                  isActive: false,
+                  pausedIntervals: [...s.pausedIntervals, { pausedAt }]
+                }
+              : s
+          );
+          
+          // Update assignment status to paused
+          const updatedAssignments = state.chapterAssignments.map(a =>
+            a.id === session.assignmentId ? { ...a, status: 'paused' as const, pausedAt } : a
+          );
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                chapterAssignments: updatedAssignments,
+                activitySessions: updatedSessions,
+                activeTimer: state.activeTimer ? { ...state.activeTimer, isPaused: true, isRunning: false } : undefined
+              }
+            },
+            chapterAssignments: updatedAssignments,
+            activitySessions: updatedSessions,
+            activeTimer: state.activeTimer ? { ...state.activeTimer, isPaused: true, isRunning: false } : undefined
+          };
+        }),
+      
+      resumeActivity: (sessionId) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const session = state.activitySessions?.find(s => s.sessionId === sessionId);
+          if (!session || session.isActive) return state;
+          
+          const resumedAt = new Date().toISOString();
+          
+          // Update the last paused interval with resume time
+          const updatedSessions = state.activitySessions.map(s => {
+            if (s.sessionId === sessionId) {
+              const intervals = [...s.pausedIntervals];
+              if (intervals.length > 0 && !intervals[intervals.length - 1].resumedAt) {
+                intervals[intervals.length - 1] = {
+                  ...intervals[intervals.length - 1],
+                  resumedAt,
+                  duration: Math.floor((new Date(resumedAt).getTime() - new Date(intervals[intervals.length - 1].pausedAt).getTime()) / 60000)
+                };
+              }
+              return { ...s, isActive: true, pausedIntervals: intervals };
+            }
+            return s;
+          });
+          
+          // Update assignment status back to in-progress
+          const updatedAssignments = state.chapterAssignments.map(a =>
+            a.id === session.assignmentId ? { ...a, status: 'in-progress' as const, pausedAt: undefined } : a
+          );
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                chapterAssignments: updatedAssignments,
+                activitySessions: updatedSessions,
+                activeTimer: state.activeTimer ? { ...state.activeTimer, isPaused: false, isRunning: true } : undefined
+              }
+            },
+            chapterAssignments: updatedAssignments,
+            activitySessions: updatedSessions,
+            activeTimer: state.activeTimer ? { ...state.activeTimer, isPaused: false, isRunning: true } : undefined
+          };
+        }),
+      
+      completeActivity: (sessionId, actualMinutes) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const session = state.activitySessions?.find(s => s.sessionId === sessionId);
+          if (!session) return state;
+          
+          const endTime = new Date().toISOString();
+          
+          // Update session with end time and duration
+          const updatedSessions = state.activitySessions.map(s =>
+            s.sessionId === sessionId
+              ? { ...s, endTime, duration: actualMinutes, isActive: false }
+              : s
+          );
+          
+          // Update assignment status to completed and record actual time
+          const updatedAssignments = state.chapterAssignments.map(a =>
+            a.id === session.assignmentId 
+              ? { 
+                  ...a, 
+                  status: 'completed' as const, 
+                  actualMinutes, 
+                  completedAt: endTime,
+                  endTime 
+                }
+              : a
+          );
+          
+          // Update chapter progress
+          const assignment = state.chapterAssignments.find(a => a.id === session.assignmentId);
+          let updatedChapters = state.chapters;
+          if (assignment) {
+            updatedChapters = state.chapters.map(c => {
+              if (c.id === assignment.chapterId) {
+                if (assignment.activityType === 'study') {
+                  return {
+                    ...c,
+                    studyStatus: 'done' as const,
+                    actualStudyHours: (c.actualStudyHours || 0) + actualMinutes / 60,
+                    completedStudyHours: (c.completedStudyHours || 0) + actualMinutes / 60,
+                    lastStudiedAt: endTime
+                  };
+                } else {
+                  return {
+                    ...c,
+                    revisionStatus: 'done' as const,
+                    actualRevisionHours: (c.actualRevisionHours || 0) + actualMinutes / 60,
+                    completedRevisionHours: (c.completedRevisionHours || 0) + actualMinutes / 60,
+                    lastRevisedAt: endTime
+                  };
+                }
+              }
+              return c;
+            });
+          }
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                chapterAssignments: updatedAssignments,
+                activitySessions: updatedSessions,
+                chapters: updatedChapters,
+                activeTimer: undefined
+              }
+            },
+            chapterAssignments: updatedAssignments,
+            activitySessions: updatedSessions,
+            chapters: updatedChapters,
+            activeTimer: undefined
+          };
+        }),
+      
+      getActiveSession: () => {
+        const state = get();
+        if (!state.currentUserId) return undefined;
+        
+        // Find the most recent active session
+        const sessions = state.activitySessions || [];
+        return sessions.find(s => s.isActive);
+      },
+      
+      // Timer actions
+      updateTimerState: (updates) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const updatedTimer = state.activeTimer ? { ...state.activeTimer, ...updates } : undefined;
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                activeTimer: updatedTimer
+              }
+            },
+            activeTimer: updatedTimer
+          };
+        }),
+      
+      resetTimer: () =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                activeTimer: undefined
+              }
+            },
+            activeTimer: undefined
+          };
+        }),
       
       // Settings actions
       updateSettings: (settings) =>
@@ -1067,6 +1502,9 @@ export const useStore = create<Store>()(
                 studyPlans: [],
                 activeStudyPlanId: undefined,
                 plannerDays: [],
+                chapterAssignments: [],
+                activitySessions: [],
+                activeTimer: undefined,
               }
             },
             exams: [],
@@ -1078,6 +1516,9 @@ export const useStore = create<Store>()(
             studyPlans: [],
             activeStudyPlanId: undefined,
             plannerDays: [],
+            chapterAssignments: [],
+            activitySessions: [],
+            activeTimer: undefined,
           };
         }),
 
@@ -1113,6 +1554,10 @@ export const useStore = create<Store>()(
             offDays: data.offDays || [],
             dailyLogs: data.dailyLogs || [],
             studyPlans: data.studyPlans || [],
+            activeStudyPlanId: data.activeStudyPlanId,
+            plannerDays: data.plannerDays || [],
+            chapterAssignments: data.chapterAssignments || [],
+            activitySessions: data.activitySessions || [],
             settings: data.settings || state.settings,
           };
           
@@ -1143,7 +1588,23 @@ export const useStore = create<Store>()(
             createdAt: od.createdAt || new Date().toISOString(),
           }));
           
-          // Update the store
+          // Process new data types
+          importedData.plannerDays = (importedData.plannerDays || []).map((pd: any) => ({
+            ...pd,
+            id: pd.id || generateId(),
+          }));
+          
+          importedData.chapterAssignments = (importedData.chapterAssignments || []).map((ca: any) => ({
+            ...ca,
+            id: ca.id || generateId(),
+          }));
+          
+          importedData.activitySessions = (importedData.activitySessions || []).map((as: any) => ({
+            ...as,
+            sessionId: as.sessionId || generateId(),
+          }));
+          
+          // Update the store with all data
           set({
             userData: {
               ...state.userData,
@@ -1155,6 +1616,10 @@ export const useStore = create<Store>()(
             offDays: importedData.offDays,
             dailyLogs: importedData.dailyLogs,
             studyPlans: importedData.studyPlans,
+            activeStudyPlanId: importedData.activeStudyPlanId,
+            plannerDays: importedData.plannerDays,
+            chapterAssignments: importedData.chapterAssignments,
+            activitySessions: importedData.activitySessions,
             settings: importedData.settings,
           });
           
@@ -1163,6 +1628,55 @@ export const useStore = create<Store>()(
           console.error('Import failed:', error);
           return false;
         }
+      },
+      
+      // Data integrity utilities
+      cleanupOrphanedData: () => {
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          // Get valid IDs
+          const validChapterIds = state.chapters.map(c => c.id);
+          const validAssignmentIds = state.chapterAssignments.map(a => a.id);
+          
+          // Clean up orphaned assignments
+          const cleanedAssignments = state.chapterAssignments.filter(a => 
+            validChapterIds.includes(a.chapterId)
+          );
+          
+          // Clean up orphaned sessions
+          const cleanedSessions = state.activitySessions.filter(s =>
+            cleanedAssignments.some(a => a.id === s.assignmentId)
+          );
+          
+          // Clean up orphaned tasks in planner days
+          const cleanedPlannerDays = state.plannerDays.map(day => ({
+            ...day,
+            plannedTasks: day.plannedTasks.filter(task => 
+              validChapterIds.includes(task.chapterId)
+            )
+          }));
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                chapterAssignments: cleanedAssignments,
+                activitySessions: cleanedSessions,
+                plannerDays: cleanedPlannerDays,
+              }
+            },
+            chapterAssignments: cleanedAssignments,
+            activitySessions: cleanedSessions,
+            plannerDays: cleanedPlannerDays,
+          };
+        });
+      },
+      
+      validateDataIntegrity: () => {
+        const state = get();
+        return validateDataIntegrity(state);
       },
       };
     },

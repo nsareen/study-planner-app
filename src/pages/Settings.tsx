@@ -1,23 +1,27 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Save, Download, Upload, Trash2, Moon, Sun, Monitor, Palette } from 'lucide-react';
+import { Save, Download, Upload, Trash2, Moon, Sun, Monitor, Palette, Lock, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
 import { themes } from '../utils/themes';
+import ConfirmDialog, { useConfirmDialog } from '../components/ConfirmDialog';
+import { prepareExportData, validateImportData } from '../store/dataSync';
 
 const Settings: React.FC = () => {
-  const { settings, updateSettings, clearAllData, importData, chapters, exams, examGroups, offDays, dailyLogs, studyPlans } = useStore();
-  const [showConfirmClear, setShowConfirmClear] = useState(false);
+  const { settings, updateSettings, clearAllData, importData, chapters, exams, examGroups, offDays, dailyLogs, studyPlans, cleanupOrphanedData, validateDataIntegrity } = useStore();
+  const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
+  const [showPinChange, setShowPinChange] = useState(false);
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmNewPin, setConfirmNewPin] = useState('');
+  const [pinChangeError, setPinChangeError] = useState('');
+  const [integrityCheckResult, setIntegrityCheckResult] = useState<{ isValid: boolean; issues: string[] } | null>(null);
   
   const handleExport = () => {
+    // Use the comprehensive export utility
+    const exportData = prepareExportData(useStore.getState());
     const data = {
-      chapters,
-      exams,
-      examGroups,
-      offDays,
-      dailyLogs,
-      studyPlans,
-      settings,
+      ...exportData,
       exportDate: new Date().toISOString(),
-      version: '2.0', // Add version for compatibility checking
+      version: '2.1', // Updated version for new data structure
     };
     
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -40,19 +44,24 @@ const Settings: React.FC = () => {
       try {
         const data = JSON.parse(e.target?.result as string);
         
-        // Validate data structure
-        if (!data || typeof data !== 'object') {
-          alert('Invalid file format. Please select a valid Study Planner backup file.');
+        // Validate data structure using utility
+        const validation = validateImportData(data);
+        if (!validation.isValid) {
+          alert(`Invalid file format: ${validation.error || 'Unknown error'}`);
           return;
         }
         
+        const validatedData = validation.data;
+        
         // Show confirmation dialog
         const itemCounts = {
-          chapters: data.chapters?.length || 0,
-          exams: data.exams?.length || 0,
-          examGroups: data.examGroups?.length || 0,
-          offDays: data.offDays?.length || 0,
-          studyPlans: data.studyPlans?.length || 0,
+          chapters: validatedData.chapters?.length || 0,
+          exams: validatedData.exams?.length || 0,
+          examGroups: validatedData.examGroups?.length || 0,
+          offDays: validatedData.offDays?.length || 0,
+          studyPlans: validatedData.studyPlans?.length || 0,
+          assignments: validatedData.chapterAssignments?.length || 0,
+          sessions: validatedData.activitySessions?.length || 0,
         };
         
         const confirmMessage = `This will import:
@@ -61,11 +70,13 @@ const Settings: React.FC = () => {
 • ${itemCounts.examGroups} exam groups
 • ${itemCounts.offDays} off days
 • ${itemCounts.studyPlans} study plans
+• ${itemCounts.assignments} scheduled activities
+• ${itemCounts.sessions} activity sessions
 
 Your current data will be replaced. Continue?`;
         
         if (confirm(confirmMessage)) {
-          const success = importData(data);
+          const success = importData(validatedData);
           
           if (success) {
             alert('✅ Data imported successfully! All your data has been restored.');
@@ -86,7 +97,50 @@ Your current data will be replaced. Continue?`;
   
   const handleClearData = () => {
     clearAllData();
-    setShowConfirmClear(false);
+  };
+  
+  const handleDataIntegrityCheck = () => {
+    const result = validateDataIntegrity();
+    setIntegrityCheckResult(result);
+    if (!result.isValid) {
+      // Show issues and offer to clean up
+      setTimeout(() => {
+        if (confirm('Data integrity issues found. Would you like to clean up orphaned data?')) {
+          cleanupOrphanedData();
+          setIntegrityCheckResult(null);
+          alert('Data cleaned up successfully!');
+        }
+      }, 100);
+    }
+  };
+  
+  const handlePinChange = () => {
+    // Validate current PIN
+    if (currentPin !== settings.parentModePIN) {
+      setPinChangeError('Current PIN is incorrect');
+      return;
+    }
+    
+    // Validate new PIN
+    if (newPin.length !== 4 || !/^\d+$/.test(newPin)) {
+      setPinChangeError('New PIN must be 4 digits');
+      return;
+    }
+    
+    // Validate confirmation
+    if (newPin !== confirmNewPin) {
+      setPinChangeError('PINs do not match');
+      return;
+    }
+    
+    // Update PIN
+    updateSettings({ parentModePIN: newPin });
+    setShowPinChange(false);
+    setCurrentPin('');
+    setNewPin('');
+    setConfirmNewPin('');
+    setPinChangeError('');
+    alert('Parent Mode PIN has been updated successfully!');
   };
   
   const getThemeIcon = () => {
@@ -253,8 +307,173 @@ Your current data will be replaced. Continue?`;
           </div>
           
           <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-indigo-600" />
+              Parent Mode
+            </h3>
+            <div className="space-y-4">
+              <div className="p-4 bg-indigo-50 rounded-lg">
+                <p className="text-sm text-indigo-800 mb-3">
+                  Parent Mode provides detailed analytics and performance metrics that are hidden from the student view.
+                </p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">Current Status:</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      settings.parentModeEnabled 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {settings.parentModeEnabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowPinChange(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                  >
+                    <Lock size={18} />
+                    Change Parent PIN
+                  </button>
+                  
+                  <p className="text-xs text-gray-600">
+                    Access Parent Mode from the Progress page by clicking the lock icon in the top-right corner.
+                  </p>
+                </div>
+              </div>
+              
+              {/* PIN Change Modal */}
+              {showPinChange && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                  <div className="bg-white rounded-xl shadow-2xl p-6 w-96">
+                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                      <Shield className="w-5 h-5 text-indigo-600" />
+                      Change Parent PIN
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Current PIN
+                        </label>
+                        <input
+                          type="password"
+                          value={currentPin}
+                          onChange={(e) => {
+                            setCurrentPin(e.target.value);
+                            setPinChangeError('');
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Enter current PIN"
+                          maxLength={4}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          New PIN
+                        </label>
+                        <input
+                          type="password"
+                          value={newPin}
+                          onChange={(e) => {
+                            setNewPin(e.target.value);
+                            setPinChangeError('');
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Enter new 4-digit PIN"
+                          maxLength={4}
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Confirm New PIN
+                        </label>
+                        <input
+                          type="password"
+                          value={confirmNewPin}
+                          onChange={(e) => {
+                            setConfirmNewPin(e.target.value);
+                            setPinChangeError('');
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Confirm new PIN"
+                          maxLength={4}
+                        />
+                      </div>
+                      
+                      {pinChangeError && (
+                        <p className="text-red-500 text-sm">{pinChangeError}</p>
+                      )}
+                      
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            setShowPinChange(false);
+                            setCurrentPin('');
+                            setNewPin('');
+                            setConfirmNewPin('');
+                            setPinChangeError('');
+                          }}
+                          className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handlePinChange}
+                          className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+                        >
+                          Update PIN
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div>
             <h3 className="text-lg font-semibold mb-4">Data Management</h3>
             <div className="space-y-3">
+              <button
+                onClick={handleDataIntegrityCheck}
+                className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+              >
+                <AlertTriangle size={18} />
+                Check Data Integrity
+              </button>
+              
+              {integrityCheckResult && (
+                <div className={`p-4 rounded-lg ${
+                  integrityCheckResult.isValid 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  <div className="flex items-center gap-2">
+                    {integrityCheckResult.isValid ? (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        <span className="font-medium">Data integrity verified - No issues found!</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="w-5 h-5" />
+                        <span className="font-medium">Data integrity issues found:</span>
+                      </>
+                    )}
+                  </div>
+                  {!integrityCheckResult.isValid && (
+                    <ul className="mt-2 text-sm space-y-1">
+                      {integrityCheckResult.issues.map((issue, idx) => (
+                        <li key={idx}>• {issue}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              
               <button
                 onClick={handleExport}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
@@ -277,7 +496,12 @@ Your current data will be replaced. Continue?`;
               </div>
               
               <button
-                onClick={() => setShowConfirmClear(true)}
+                onClick={() => showConfirm(
+                  'Clear All Data',
+                  'Are you sure you want to delete ALL your study data? This includes all chapters, exams, study plans, and progress. This action cannot be undone!',
+                  handleClearData,
+                  'danger'
+                )}
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
               >
                 <Trash2 size={18} />
@@ -286,29 +510,18 @@ Your current data will be replaced. Continue?`;
             </div>
           </div>
           
-          {showConfirmClear && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800 mb-3">
-                Are you sure you want to clear all data? This action cannot be undone.
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={handleClearData}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-                >
-                  Yes, Clear All
-                </button>
-                <button
-                  onClick={() => setShowConfirmClear(false)}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
+      
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.isOpen}
+        onClose={hideConfirm}
+        onConfirm={dialogState.onConfirm}
+        title={dialogState.title}
+        message={dialogState.message}
+        type={dialogState.type}
+      />
     </div>
   );
 };

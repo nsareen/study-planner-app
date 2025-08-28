@@ -5,6 +5,7 @@ import {
   Settings, Upload, Download, FolderPlus, Shuffle
 } from 'lucide-react';
 import type { Chapter } from '../types';
+import ConfirmDialog, { useConfirmDialog } from './ConfirmDialog';
 
 interface EnhancedMatrixEditorProps {
   chapters: Chapter[];
@@ -27,6 +28,7 @@ const EnhancedMatrixEditor: React.FC<EnhancedMatrixEditorProps> = ({
   onBulkUpdate,
   onReorderChapters
 }) => {
+  const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
   const [expandedSubjects, setExpandedSubjects] = useState<Set<string>>(new Set());
   const [editingChapter, setEditingChapter] = useState<string | null>(null);
   const [editingSubject, setEditingSubject] = useState<string | null>(null);
@@ -133,10 +135,15 @@ const EnhancedMatrixEditor: React.FC<EnhancedMatrixEditorProps> = ({
 
     switch (action) {
       case 'delete':
-        if (window.confirm(`Delete ${selectedIds.length} selected chapters?`)) {
-          selectedIds.forEach(id => onDeleteChapter(id));
-          setSelectedChapters(new Set());
-        }
+        showConfirm(
+          'Delete Selected Chapters',
+          `Are you sure you want to delete ${selectedIds.length} selected chapters? This action cannot be undone.`,
+          () => {
+            selectedIds.forEach(id => onDeleteChapter(id));
+            setSelectedChapters(new Set());
+          },
+          'danger'
+        );
         break;
       case 'setHours':
         onBulkUpdate(selectedIds, {
@@ -363,11 +370,12 @@ const EnhancedMatrixEditor: React.FC<EnhancedMatrixEditorProps> = ({
                       Add Chapter
                     </button>
                     <button
-                      onClick={() => {
-                        if (window.confirm(`Delete subject "${subject}" and all its chapters?`)) {
-                          onDeleteSubject(subject);
-                        }
-                      }}
+                      onClick={() => showConfirm(
+                        'Delete Subject',
+                        `Are you sure you want to delete "${subject}" and all its chapters? This will remove all progress and cannot be undone.`,
+                        () => onDeleteSubject(subject),
+                        'danger'
+                      )}
                       className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -530,11 +538,12 @@ const EnhancedMatrixEditor: React.FC<EnhancedMatrixEditorProps> = ({
                                 <Copy className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => {
-                                  if (window.confirm(`Delete "${chapter.name}"?`)) {
-                                    onDeleteChapter(chapter.id);
-                                  }
-                                }}
+                                onClick={() => showConfirm(
+                                  'Delete Chapter',
+                                  `Are you sure you want to delete "${chapter.name}"? This action cannot be undone.`,
+                                  () => onDeleteChapter(chapter.id),
+                                  'danger'
+                                )}
                                 className="p-1 text-red-500 hover:text-red-700"
                                 title="Delete chapter"
                               >
@@ -566,6 +575,16 @@ const EnhancedMatrixEditor: React.FC<EnhancedMatrixEditorProps> = ({
           <li>• Clone chapters to quickly create similar content</li>
         </ul>
       </div>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={dialogState.isOpen}
+        onClose={hideConfirm}
+        onConfirm={dialogState.onConfirm}
+        title={dialogState.title}
+        message={dialogState.message}
+        type={dialogState.type}
+      />
     </div>
   );
 };
