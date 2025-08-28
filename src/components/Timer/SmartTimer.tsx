@@ -22,8 +22,9 @@ interface SmartTimerProps {
   mode: 'single' | 'subject' | 'daily';
   sessionType: 'study' | 'revision';
   plannedMinutes: number;
-  onComplete: (actualMinutes: number, chapterId?: string) => void;
-  onProgress: (minutes: number) => void;
+  onComplete?: (actualMinutes: number, chapterId?: string) => void;
+  onProgress?: (minutes: number) => void;
+  onStart?: () => void;
 }
 
 const SmartTimer: React.FC<SmartTimerProps> = ({
@@ -34,6 +35,7 @@ const SmartTimer: React.FC<SmartTimerProps> = ({
   plannedMinutes,
   onComplete,
   onProgress,
+  onStart,
 }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -71,7 +73,7 @@ const SmartTimer: React.FC<SmartTimerProps> = ({
           const newElapsed = prev + 1;
           // Report progress every minute
           if (newElapsed % 60 === 0) {
-            onProgress(Math.floor(newElapsed / 60));
+            onProgress?.(Math.floor(newElapsed / 60));
           }
           return newElapsed;
         });
@@ -104,6 +106,7 @@ const SmartTimer: React.FC<SmartTimerProps> = ({
     setIsRunning(true);
     setIsPaused(false);
     setSessionStartTime(new Date());
+    onStart?.();
   };
 
   const handlePause = () => {
@@ -124,7 +127,7 @@ const SmartTimer: React.FC<SmartTimerProps> = ({
   const handleStop = () => {
     setIsRunning(false);
     setIsPaused(false);
-    onComplete(actualMinutes, currentChapter?.id);
+    onComplete?.(actualMinutes, currentChapter?.id);
   };
 
   const handleReset = () => {
@@ -139,7 +142,7 @@ const SmartTimer: React.FC<SmartTimerProps> = ({
     if (mode !== 'single' && currentChapterIndex < chapters.length - 1) {
       // Save progress for current chapter
       if (currentChapter) {
-        onComplete(actualMinutes, currentChapter.id);
+        onComplete?.(actualMinutes, currentChapter.id);
       }
       // Move to next chapter
       setCurrentChapterIndex(prev => prev + 1);

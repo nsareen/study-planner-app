@@ -3,12 +3,13 @@ import {
   CheckCircle, Circle, Clock, BookOpen, Target, TrendingUp, 
   Calendar, AlertTriangle, Play, ChevronDown, ChevronUp,
   RotateCcw, Edit2, Save, X, CalendarPlus, Trash2, RefreshCw,
-  PlayCircle, PauseCircle, CheckSquare, Square
+  PlayCircle, PauseCircle, CheckSquare, Square, Timer
 } from 'lucide-react';
 import type { Chapter, PlannerDay, PlannerTask, Exam } from '../types';
 import { format, addDays, startOfDay, isSameDay } from 'date-fns';
 import SubjectQuickActions from './SubjectQuickActions';
 import FlexibleCalendar from './Calendar/FlexibleCalendar';
+import TimerModal from './Timer/TimerModal';
 
 interface MatrixPlannerViewProps {
   chapters: Chapter[];
@@ -50,6 +51,14 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showFullCalendar, setShowFullCalendar] = useState(true); // Default to showing full calendar
   const [calendarView, setCalendarView] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [showTimer, setShowTimer] = useState(false);
+  const [timerConfig, setTimerConfig] = useState<{
+    chapter?: Chapter;
+    chapters?: Chapter[];
+    task?: PlannerTask;
+    mode: 'single' | 'subject' | 'daily';
+    sessionType?: 'study' | 'revision';
+  }>({ mode: 'single' });
   const startDate = startOfDay(new Date());
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
   const monthDays = Array.from({ length: 30 }, (_, i) => addDays(startDate, i));
@@ -150,6 +159,50 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
       completedRevisionHours: nextStatus === 'done' ? (chapter.revisionHours || 1) : 
                               nextStatus === 'in-progress' ? (chapter.completedRevisionHours || 0) : 0
     });
+  };
+
+  // Timer handlers
+  const openTimerForChapter = (chapter: Chapter, sessionType: 'study' | 'revision') => {
+    setTimerConfig({
+      chapter,
+      mode: 'single',
+      sessionType,
+    });
+    setShowTimer(true);
+  };
+
+  const openTimerForSubject = (subject: string, sessionType: 'study' | 'revision') => {
+    const subjectChapters = chaptersBySubject[subject] || [];
+    setTimerConfig({
+      chapters: subjectChapters,
+      mode: 'subject',
+      sessionType,
+    });
+    setShowTimer(true);
+  };
+
+  const openTimerForTask = (task: PlannerTask) => {
+    const chapter = chapters.find(c => c.id === task.chapterId);
+    if (chapter) {
+      setTimerConfig({
+        chapter,
+        task,
+        mode: 'single',
+        sessionType: task.taskType,
+      });
+      setShowTimer(true);
+    }
+  };
+
+  const handleTimerComplete = (actualMinutes: number) => {
+    // Update actual hours in the chapter
+    if (timerConfig.chapter) {
+      const field = timerConfig.sessionType === 'study' ? 'actualStudyHours' : 'actualRevisionHours';
+      onUpdateChapterStatus?.(timerConfig.chapter.id, {
+        [field]: actualMinutes / 60
+      });
+    }
+    setShowTimer(false);
   };
 
   // Get tasks for a specific date
@@ -345,6 +398,24 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
                                  chapter.revisionStatus === 'in-progress' ? <PauseCircle size={16} /> :
                                  <Circle size={16} />}
                               </button>
+                              
+                              {/* Timer buttons */}
+                              <div className="flex gap-1">
+                                <button
+                                  onClick={() => openTimerForChapter(chapter, 'study')}
+                                  className="p-1 text-blue-600 hover:bg-blue-100 rounded transition-colors"
+                                  title="Start study timer"
+                                >
+                                  <Timer size={16} />
+                                </button>
+                                <button
+                                  onClick={() => openTimerForChapter(chapter, 'revision')}
+                                  className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+                                  title="Start revision timer"
+                                >
+                                  <Timer size={16} />
+                                </button>
+                              </div>
                               
                               {/* Calendar buttons */}
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100">
@@ -568,16 +639,22 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
                     {tasks.slice(0, 3).map(task => (
                       <div
                         key={task.id}
-                        className={`text-xs p-1 rounded cursor-pointer ${
+                        className={`text-xs p-1 rounded group flex items-center justify-between ${
                           task.taskType === 'study' 
                             ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
                             : 'bg-green-100 text-green-700 hover:bg-green-200'
                         }`}
-                        onClick={() => onStartTask(task)}
                       >
-                        <div className="truncate">
+                        <div className="truncate flex-1">
                           {task.taskType === 'study' ? '📖' : '🔄'} {task.chapterName}
                         </div>
+                        <button
+                          onClick={() => openTimerForTask(task)}
+                          className="ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Start timer"
+                        >
+                          <Play size={12} />
+                        </button>
                       </div>
                     ))}
                     {tasks.length > 3 && (
@@ -767,6 +844,19 @@ const MatrixPlannerView: React.FC<MatrixPlannerViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Timer Modal */}
+      <TimerModal
+        isOpen={showTimer}
+        onClose={() => setShowTimer(false)}
+        chapter={timerConfig.chapter}
+        chapters={timerConfig.chapters}
+        task={timerConfig.task}
+        mode={timerConfig.mode}
+        sessionType={timerConfig.sessionType}
+        onComplete={handleTimerComplete}
+        onUpdateChapterStatus={onUpdateChapterStatus}
+      />
     </div>
   );
 };
