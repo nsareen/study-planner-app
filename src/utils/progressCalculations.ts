@@ -1,4 +1,4 @@
-import { Chapter, ChapterAssignment } from '../types';
+import type { Chapter, ChapterAssignment } from '../types';
 
 /**
  * Calculate overall progress for chapters

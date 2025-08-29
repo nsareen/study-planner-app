@@ -1,18 +1,22 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, BookOpen, RefreshCw, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, BookOpen, RefreshCw, X, ChevronLeft, ChevronRight, Target } from 'lucide-react';
 import { format, addDays, startOfWeek, endOfWeek, isSameDay, isToday, isBefore, startOfDay } from 'date-fns';
-import type { Chapter } from '../types';
+import type { Chapter, StudyPlan } from '../types';
+import PlanSelectionDialog from './PlanSelectionDialog';
 
 interface ChapterSchedulerProps {
   isOpen: boolean;
   chapter: Chapter | null;
   onClose: () => void;
-  onSchedule: (chapterId: string, date: Date, activityType: 'study' | 'revision', duration?: number) => void;
+  onSchedule: (chapterId: string, date: Date, activityType: 'study' | 'revision', duration?: number, planId?: string) => void;
   existingSchedules?: Array<{
     date: string;
     chapterId: string;
     activityType: 'study' | 'revision';
   }>;
+  plans?: StudyPlan[];
+  activeStudyPlanId?: string;
+  onCreateNewPlan?: () => void;
 }
 
 const ChapterScheduler: React.FC<ChapterSchedulerProps> = ({
@@ -20,12 +24,17 @@ const ChapterScheduler: React.FC<ChapterSchedulerProps> = ({
   chapter,
   onClose,
   onSchedule,
-  existingSchedules = []
+  existingSchedules = [],
+  plans = [],
+  activeStudyPlanId,
+  onCreateNewPlan
 }) => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [activityType, setActivityType] = useState<'study' | 'revision'>('study');
   const [customDuration, setCustomDuration] = useState<number | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showPlanSelection, setShowPlanSelection] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | undefined>(activeStudyPlanId);
   
   if (!isOpen || !chapter) return null;
   
@@ -35,8 +44,25 @@ const ChapterScheduler: React.FC<ChapterSchedulerProps> = ({
   
   const handleSchedule = () => {
     if (selectedDate) {
+      // If plans exist and we need to select one, show plan selection
+      if (plans.length > 1 && !selectedPlanId) {
+        setShowPlanSelection(true);
+      } else {
+        // Proceed with scheduling
+        const duration = customDuration || defaultDuration;
+        onSchedule(chapter.id, selectedDate, activityType, duration, selectedPlanId);
+        onClose();
+      }
+    }
+  };
+  
+  const handlePlanSelected = (planId: string) => {
+    setSelectedPlanId(planId);
+    setShowPlanSelection(false);
+    // Now schedule with the selected plan
+    if (selectedDate) {
       const duration = customDuration || defaultDuration;
-      onSchedule(chapter.id, selectedDate, activityType, duration);
+      onSchedule(chapter.id, selectedDate, activityType, duration, planId);
       onClose();
     }
   };
@@ -266,6 +292,17 @@ const ChapterScheduler: React.FC<ChapterSchedulerProps> = ({
           </button>
         </div>
       </div>
+      
+      {/* Plan Selection Dialog */}
+      <PlanSelectionDialog
+        isOpen={showPlanSelection}
+        onClose={() => setShowPlanSelection(false)}
+        onSelectPlan={handlePlanSelected}
+        plans={plans}
+        activeStudyPlanId={activeStudyPlanId}
+        chapter={chapter}
+        onCreateNewPlan={onCreateNewPlan}
+      />
     </div>
   );
 };

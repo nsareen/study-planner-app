@@ -260,6 +260,26 @@ export interface StudyPlan {
   createdAt: string;
   updatedAt: string;
   notes?: string;
+  isDefault?: boolean;      // Marks general study plan
+  assignmentIds?: string[]; // Track linked assignments
+  
+  completionCriteria?: {
+    type: 'all_tasks' | 'percentage' | 'manual' | 'date_based';
+    targetPercentage?: number;
+    autoComplete?: boolean;
+    notifyBeforeCompletion?: boolean;
+  };
+  
+  completionSummary?: {
+    completedAt: string;
+    totalAssignments: number;
+    completedAssignments: number;
+    cancelledAssignments: number;
+    actualStudyHours: number;
+    actualRevisionHours: number;
+    efficiency: number;
+    achievements: string[];
+  };
 }
 
 export interface SubjectConfig {
@@ -284,6 +304,9 @@ export interface ChapterAssignment {
   pausedAt?: string;
   completedAt?: string;
   createdAt: string;
+  planId?: string;          // Link to StudyPlan
+  planName?: string;        // Cached for display
+  originalPlanId?: string;  // Track if moved between plans
 }
 
 export interface ActivitySession {

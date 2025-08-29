@@ -53,13 +53,21 @@ interface StoreActions {
   deleteStudyPlan: (id: string) => void;
   setActiveStudyPlan: (id: string) => void;
   duplicateStudyPlan: (id: string, newName: string) => void;
+  ensureDefaultPlan: () => void;
+  getOrCreateActivePlan: () => StudyPlan;
+  completePlan: (planId: string, options: { moveIncompleteTo?: string; cancelIncomplete?: boolean }) => void;
+  canCompletePlan: (planId: string) => boolean;
+  checkAutoCompletion: (planId: string) => void;
   
   // Chapter Assignment actions (NEW)
-  scheduleChapter: (chapterId: string, date: string, activityType: 'study' | 'revision', plannedMinutes: number) => void;
+  scheduleChapter: (chapterId: string, date: string, activityType: 'study' | 'revision', plannedMinutes: number, planId?: string) => void;
   updateAssignment: (id: string, updates: Partial<ChapterAssignment>) => void;
   deleteAssignment: (id: string) => void;
   getAssignmentsForDate: (date: string) => ChapterAssignment[];
   getAssignmentsForChapter: (chapterId: string) => ChapterAssignment[];
+  getAssignmentsForPlan: (planId: string) => ChapterAssignment[];
+  linkAssignmentToPlan: (assignmentId: string, planId: string) => void;
+  moveAssignmentsBetweenPlans: (assignmentIds: string[], targetPlanId: string) => void;
   
   // Activity Session actions (NEW)
   startActivity: (assignmentId: string) => void;
@@ -87,6 +95,7 @@ interface StoreActions {
   cleanupSessions: () => void;
   importData: (data: any) => boolean;
   cleanupOrphanedData: () => void;
+  migrateOrphanedAssignments: () => void;
   validateDataIntegrity: () => { isValid: boolean; issues: string[] };
   
   // Helper getters for current user data
@@ -339,6 +348,12 @@ export const useStore = create<Store>()(
         
         // Update last active
         get().updateUserProfile(userId, { lastActive: new Date().toISOString() });
+        
+        // Ensure default plan exists and migrate orphaned assignments
+        setTimeout(() => {
+          get().ensureDefaultPlan();
+          get().migrateOrphanedAssignments();
+        }, 100);
       },
       
       getCurrentUser: () => {
@@ -1060,10 +1075,232 @@ export const useStore = create<Store>()(
         get().addStudyPlan({ ...planWithoutId, name: newName });
       },
       
-      // Chapter Assignment actions
-      scheduleChapter: (chapterId, date, activityType, plannedMinutes) =>
+      ensureDefaultPlan: () => {
+        const state = get();
+        if (!state.currentUserId) return;
+        
+        const plans = state.studyPlans || [];
+        const hasDefaultPlan = plans.some(p => p.isDefault);
+        
+        if (!hasDefaultPlan) {
+          const today = new Date();
+          const defaultPlan: Omit<StudyPlan, 'id' | 'createdAt' | 'updatedAt'> = {
+            name: 'General Study',
+            startDate: today.toISOString(),
+            endDate: new Date(today.getFullYear() + 1, today.getMonth(), today.getDate()).toISOString(),
+            days: [],
+            chapterIds: [],
+            totalStudyHours: 0,
+            totalRevisionHours: 0,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'active',
+            isDefault: true,
+            assignmentIds: [],
+            notes: 'Default plan for general study activities',
+          };
+          
+          get().addStudyPlan(defaultPlan);
+          
+          // Set as active if no active plan exists
+          if (!state.activeStudyPlanId) {
+            const newPlans = get().studyPlans || [];
+            const createdPlan = newPlans.find(p => p.isDefault);
+            if (createdPlan) {
+              get().setActiveStudyPlan(createdPlan.id);
+            }
+          }
+        }
+      },
+      
+      getOrCreateActivePlan: () => {
+        const state = get();
+        if (!state.currentUserId) {
+          throw new Error('No user logged in');
+        }
+        
+        // Ensure default plan exists
+        get().ensureDefaultPlan();
+        
+        // Get active plan
+        let activePlan = state.studyPlans?.find(p => p.id === state.activeStudyPlanId);
+        
+        // If no active plan, use default plan
+        if (!activePlan) {
+          activePlan = state.studyPlans?.find(p => p.isDefault);
+          if (activePlan) {
+            get().setActiveStudyPlan(activePlan.id);
+          }
+        }
+        
+        // If still no plan (shouldn't happen), create one
+        if (!activePlan) {
+          get().ensureDefaultPlan();
+          const updatedState = get();
+          activePlan = updatedState.studyPlans?.find(p => p.isDefault);
+        }
+        
+        if (!activePlan) {
+          throw new Error('Failed to create or find active plan');
+        }
+        
+        return activePlan;
+      },
+      
+      completePlan: (planId, options) =>
         set((state) => {
           if (!state.currentUserId) return state;
+          
+          const plan = state.studyPlans?.find(p => p.id === planId);
+          if (!plan) return state;
+          
+          // Get assignments for this plan
+          const planAssignments = get().getAssignmentsForPlan(planId);
+          const completedAssignments = planAssignments.filter(a => a.status === 'completed');
+          const incompleteAssignments = planAssignments.filter(a => a.status !== 'completed');
+          
+          // Handle incomplete assignments
+          let updatedAssignments = [...state.chapterAssignments];
+          if (options.moveIncompleteTo && incompleteAssignments.length > 0) {
+            const targetPlanId = options.moveIncompleteTo;
+            incompleteAssignments.forEach(assignment => {
+              get().linkAssignmentToPlan(assignment.id, targetPlanId);
+            });
+            updatedAssignments = get().chapterAssignments;
+          } else if (options.cancelIncomplete) {
+            updatedAssignments = updatedAssignments.filter(
+              a => !incompleteAssignments.some(inc => inc.id === a.id)
+            );
+          }
+          
+          // Calculate completion summary
+          const completionSummary = {
+            completedAt: new Date().toISOString(),
+            totalAssignments: planAssignments.length,
+            completedAssignments: completedAssignments.length,
+            cancelledAssignments: options.cancelIncomplete ? incompleteAssignments.length : 0,
+            actualStudyHours: completedAssignments
+              .filter(a => a.activityType === 'study')
+              .reduce((sum, a) => sum + (a.actualMinutes || a.plannedMinutes) / 60, 0),
+            actualRevisionHours: completedAssignments
+              .filter(a => a.activityType === 'revision')
+              .reduce((sum, a) => sum + (a.actualMinutes || a.plannedMinutes) / 60, 0),
+            efficiency: planAssignments.length > 0 
+              ? (completedAssignments.length / planAssignments.length) * 100 
+              : 0,
+            achievements: [] as string[],
+          };
+          
+          // Add achievements based on performance
+          if (completionSummary.efficiency === 100) {
+            completionSummary.achievements.push('Perfect Completion! 🌟');
+          } else if (completionSummary.efficiency >= 90) {
+            completionSummary.achievements.push('Excellent Progress! ⭐');
+          } else if (completionSummary.efficiency >= 75) {
+            completionSummary.achievements.push('Good Effort! 👍');
+          }
+          
+          // Update plan status
+          const updatedPlans = (state.studyPlans || []).map(p => {
+            if (p.id === planId) {
+              return {
+                ...p,
+                status: 'completed' as const,
+                completionSummary,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return p;
+          });
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                studyPlans: updatedPlans,
+                chapterAssignments: updatedAssignments,
+              }
+            },
+            studyPlans: updatedPlans,
+            chapterAssignments: updatedAssignments,
+          };
+        }),
+      
+      canCompletePlan: (planId) => {
+        const state = get();
+        if (!state.currentUserId) return false;
+        
+        const plan = state.studyPlans?.find(p => p.id === planId);
+        if (!plan) return false;
+        
+        const assignments = get().getAssignmentsForPlan(planId);
+        if (assignments.length === 0) return false;
+        
+        const completedCount = assignments.filter(a => a.status === 'completed').length;
+        const completionRate = (completedCount / assignments.length) * 100;
+        
+        // Check completion criteria
+        if (plan.completionCriteria) {
+          switch (plan.completionCriteria.type) {
+            case 'all_tasks':
+              return completionRate === 100;
+            case 'percentage':
+              return completionRate >= (plan.completionCriteria.targetPercentage || 90);
+            case 'date_based':
+              const today = new Date();
+              const endDate = new Date(plan.endDate);
+              return today >= endDate && completionRate >= 80;
+            case 'manual':
+            default:
+              return completionRate >= 50;
+          }
+        }
+        
+        // Default: can complete if > 50% done
+        return completionRate >= 50;
+      },
+      
+      checkAutoCompletion: (planId) => {
+        const state = get();
+        if (!state.currentUserId) return;
+        
+        const plan = state.studyPlans?.find(p => p.id === planId);
+        if (!plan || !plan.completionCriteria?.autoComplete) return;
+        
+        const assignments = get().getAssignmentsForPlan(planId);
+        const completedCount = assignments.filter(a => a.status === 'completed').length;
+        const completionRate = (completedCount / assignments.length) * 100;
+        
+        // Check if meets auto-completion threshold
+        if (plan.completionCriteria.type === 'all_tasks' && completionRate === 100) {
+          get().completePlan(planId, { cancelIncomplete: false });
+        } else if (
+          plan.completionCriteria.type === 'percentage' && 
+          completionRate >= (plan.completionCriteria.targetPercentage || 90)
+        ) {
+          // TODO: Show notification to user about auto-completion
+          console.log(`Plan "${plan.name}" is ready for completion (${completionRate}% complete)`);
+        }
+      },
+      
+      // Chapter Assignment actions
+      scheduleChapter: (chapterId, date, activityType, plannedMinutes, planId) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          // If no planId provided, use active plan or create default
+          let assignmentPlanId = planId;
+          let planName: string | undefined;
+          
+          if (!assignmentPlanId) {
+            const activePlan = get().getOrCreateActivePlan();
+            assignmentPlanId = activePlan.id;
+            planName = activePlan.name;
+          } else {
+            const plan = state.studyPlans?.find(p => p.id === assignmentPlanId);
+            planName = plan?.name;
+          }
           
           const assignment: ChapterAssignment = {
             id: generateId(),
@@ -1073,9 +1310,23 @@ export const useStore = create<Store>()(
             plannedMinutes,
             status: 'scheduled',
             createdAt: new Date().toISOString(),
+            planId: assignmentPlanId,
+            planName,
           };
           
           const updatedAssignments = [...(state.chapterAssignments || []), assignment];
+          
+          // Update plan's assignmentIds if it exists
+          const updatedPlans = (state.studyPlans || []).map(plan => {
+            if (plan.id === assignmentPlanId) {
+              return {
+                ...plan,
+                assignmentIds: [...(plan.assignmentIds || []), assignment.id],
+                updatedAt: new Date().toISOString(),
+              };
+            }
+            return plan;
+          });
           
           return {
             userData: {
@@ -1083,9 +1334,11 @@ export const useStore = create<Store>()(
               [state.currentUserId]: {
                 ...state.userData[state.currentUserId],
                 chapterAssignments: updatedAssignments,
+                studyPlans: updatedPlans,
               }
             },
             chapterAssignments: updatedAssignments,
+            studyPlans: updatedPlans,
           };
         }),
         
@@ -1143,6 +1396,72 @@ export const useStore = create<Store>()(
         return (state.chapterAssignments || []).filter(
           (assignment) => assignment.chapterId === chapterId
         );
+      },
+      
+      getAssignmentsForPlan: (planId) => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return (state.chapterAssignments || []).filter(
+          (assignment) => assignment.planId === planId
+        );
+      },
+      
+      linkAssignmentToPlan: (assignmentId, planId) =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const plan = state.studyPlans?.find(p => p.id === planId);
+          if (!plan) return state;
+          
+          const updatedAssignments = (state.chapterAssignments || []).map(assignment => {
+            if (assignment.id === assignmentId) {
+              return {
+                ...assignment,
+                planId,
+                planName: plan.name,
+                originalPlanId: assignment.originalPlanId || assignment.planId,
+              };
+            }
+            return assignment;
+          });
+          
+          // Update plan's assignmentIds
+          const updatedPlans = (state.studyPlans || []).map(p => {
+            if (p.id === planId) {
+              const newAssignmentIds = [...(p.assignmentIds || [])];
+              if (!newAssignmentIds.includes(assignmentId)) {
+                newAssignmentIds.push(assignmentId);
+              }
+              return { ...p, assignmentIds: newAssignmentIds };
+            }
+            // Remove from old plan if exists
+            if (p.assignmentIds?.includes(assignmentId)) {
+              return {
+                ...p,
+                assignmentIds: p.assignmentIds.filter(id => id !== assignmentId),
+              };
+            }
+            return p;
+          });
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                chapterAssignments: updatedAssignments,
+                studyPlans: updatedPlans,
+              }
+            },
+            chapterAssignments: updatedAssignments,
+            studyPlans: updatedPlans,
+          };
+        }),
+      
+      moveAssignmentsBetweenPlans: (assignmentIds, targetPlanId) => {
+        assignmentIds.forEach(id => {
+          get().linkAssignmentToPlan(id, targetPlanId);
+        });
       },
       
       // Activity Session actions
@@ -1814,6 +2133,63 @@ export const useStore = create<Store>()(
             plannerDays: cleanedPlannerDays,
           };
         });
+      },
+      
+      migrateOrphanedAssignments: () => {
+        const state = get();
+        if (!state.currentUserId) return;
+        
+        // Ensure default plan exists first
+        get().ensureDefaultPlan();
+        
+        // Find orphaned assignments (those without planId)
+        const orphanedAssignments = (state.chapterAssignments || []).filter(a => !a.planId);
+        
+        if (orphanedAssignments.length === 0) {
+          console.log('No orphaned assignments to migrate');
+          return;
+        }
+        
+        // Find or create migration plan
+        let migrationPlan = state.studyPlans?.find(p => p.name === 'Migrated Activities');
+        
+        if (!migrationPlan) {
+          // Calculate date range for migrated activities
+          const dates = orphanedAssignments.map(a => new Date(a.date).getTime());
+          const minDate = new Date(Math.min(...dates));
+          const maxDate = new Date(Math.max(...dates));
+          
+          // Create migration plan
+          const newPlan: Omit<StudyPlan, 'id' | 'createdAt' | 'updatedAt'> = {
+            name: 'Migrated Activities',
+            startDate: minDate.toISOString(),
+            endDate: maxDate.toISOString(),
+            days: [],
+            chapterIds: [],
+            totalStudyHours: 0,
+            totalRevisionHours: 0,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'active',
+            assignmentIds: orphanedAssignments.map(a => a.id),
+            notes: 'Auto-created plan for previously scheduled activities',
+          };
+          
+          get().addStudyPlan(newPlan);
+          
+          // Get the created plan
+          const updatedState = get();
+          migrationPlan = updatedState.studyPlans?.find(p => p.name === 'Migrated Activities');
+        }
+        
+        if (migrationPlan) {
+          // Link all orphaned assignments to the migration plan
+          orphanedAssignments.forEach(assignment => {
+            get().linkAssignmentToPlan(assignment.id, migrationPlan!.id);
+          });
+          
+          console.log(`Migrated ${orphanedAssignments.length} orphaned assignments to "${migrationPlan.name}" plan`);
+        }
       },
       
       validateDataIntegrity: () => {
