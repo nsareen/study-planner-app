@@ -1,12 +1,30 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Save, Download, Upload, Trash2, Moon, Sun, Monitor, Palette, Lock, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Save, Download, Upload, Trash2, Moon, Sun, Monitor, Palette, Lock, Shield, AlertTriangle, CheckCircle, RefreshCw, Activity, Clock } from 'lucide-react';
 import { themes } from '../utils/themes';
 import ConfirmDialog, { useConfirmDialog } from '../components/ConfirmDialog';
 import { prepareExportData, validateImportData } from '../store/dataSync';
 
 const Settings: React.FC = () => {
-  const { settings, updateSettings, clearAllData, importData, chapters, exams, examGroups, offDays, dailyLogs, studyPlans, cleanupOrphanedData, validateDataIntegrity } = useStore();
+  const { 
+    settings, 
+    updateSettings, 
+    clearAllData, 
+    importData, 
+    chapters, 
+    exams, 
+    examGroups, 
+    offDays, 
+    dailyLogs, 
+    studyPlans, 
+    cleanupOrphanedData, 
+    validateDataIntegrity,
+    resetActiveSessionsAndTimers,
+    validateAndFixSessionState,
+    cleanupSessions,
+    activitySessions,
+    activeTimer
+  } = useStore();
   const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
   const [showPinChange, setShowPinChange] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
@@ -448,6 +466,8 @@ Your current data will be replaced. Continue?`;
               <button
                 onClick={() => {
                   if (window.confirm('This will clean up any corrupted timer sessions and remove old data. Continue?')) {
+                    // Use the comprehensive reset function
+                    useStore.getState().resetActiveSessionsAndTimers();
                     useStore.getState().cleanupSessions();
                     alert('Sessions cleaned up successfully! If you had a stuck timer, it should be fixed now.');
                   }
@@ -520,6 +540,85 @@ Your current data will be replaced. Continue?`;
                 <Trash2 size={18} />
                 Clear All Data
               </button>
+            </div>
+          </div>
+
+          {/* Session Management */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Activity className="w-5 h-5 text-purple-600" />
+              Session Management
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Session Status */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium">Active Sessions</span>
+                  <span className="text-sm text-gray-600">
+                    {activitySessions?.filter(s => s.isActive).length || 0} active
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Timer Status</span>
+                  <span className={`text-sm font-medium ${activeTimer?.isRunning ? 'text-green-600' : 'text-gray-600'}`}>
+                    {activeTimer?.isRunning ? 'Running' : 'Stopped'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Reset Actions */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    validateAndFixSessionState();
+                    alert('✅ Session state validated and fixed successfully!');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors w-full justify-center"
+                >
+                  <RefreshCw size={18} />
+                  Validate & Fix Sessions
+                </button>
+
+                <button
+                  onClick={() => showConfirm(
+                    'Reset Active Sessions',
+                    'This will stop all running timers and end all active study sessions. Are you sure?',
+                    () => {
+                      resetActiveSessionsAndTimers();
+                      alert('✅ All sessions and timers have been reset!');
+                    },
+                    'warning'
+                  )}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors w-full justify-center"
+                >
+                  <Clock size={18} />
+                  Reset All Timers
+                </button>
+
+                <button
+                  onClick={() => showConfirm(
+                    'Clean Up Sessions',
+                    'This will remove all corrupted or orphaned sessions. Continue?',
+                    () => {
+                      cleanupSessions();
+                      alert('✅ Sessions cleaned up successfully!');
+                    },
+                    'info'
+                  )}
+                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors w-full justify-center"
+                >
+                  <Trash2 size={18} />
+                  Clean Up Sessions
+                </button>
+              </div>
+
+              {/* Help Text */}
+              <div className="text-xs text-gray-500 space-y-1 mt-4">
+                <p>• <strong>Validate & Fix:</strong> Checks and fixes inconsistencies between sessions and activities</p>
+                <p>• <strong>Reset Timers:</strong> Stops all running timers and ends active sessions</p>
+                <p>• <strong>Clean Up:</strong> Removes corrupted or orphaned session data</p>
+              </div>
             </div>
           </div>
           

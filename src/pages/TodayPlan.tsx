@@ -52,7 +52,11 @@ const TodayPlan: React.FC = () => {
   
   // Timer effect for active sessions
   useEffect(() => {
-    if (!activeSession) return;
+    // Clear all timers if no active session
+    if (!activeSession) {
+      setTimer({});
+      return;
+    }
     
     // Calculate total paused time
     const calculateElapsedTime = () => {

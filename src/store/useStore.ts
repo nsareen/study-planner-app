@@ -93,10 +93,12 @@ interface StoreActions {
   clearAllData: () => void;
   clearAllChapters: () => void;
   cleanupSessions: () => void;
+  resetActiveSessionsAndTimers: () => void;
   importData: (data: any) => boolean;
   cleanupOrphanedData: () => void;
   migrateOrphanedAssignments: () => void;
   validateDataIntegrity: () => { isValid: boolean; issues: string[] };
+  validateAndFixSessionState: () => void;
   
   // Helper getters for current user data
   exams: Exam[];
@@ -1366,9 +1368,22 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
+          // Check if this assignment has an active timer/session
+          const activeSession = state.activitySessions?.find(
+            s => s.assignmentId === id && s.isActive
+          );
+          
           const updatedAssignments = (state.chapterAssignments || []).filter(
             (assignment) => assignment.id !== id
           );
+          
+          // Clean up any active sessions for this assignment
+          const updatedSessions = state.activitySessions?.filter(
+            s => s.assignmentId !== id
+          ) || [];
+          
+          // Stop timer if this assignment was being tracked
+          const shouldStopTimer = activeSession !== undefined;
           
           return {
             userData: {
@@ -1376,9 +1391,13 @@ export const useStore = create<Store>()(
               [state.currentUserId]: {
                 ...state.userData[state.currentUserId],
                 chapterAssignments: updatedAssignments,
+                activitySessions: updatedSessions,
+                activeTimer: shouldStopTimer ? undefined : state.userData[state.currentUserId]?.activeTimer
               }
             },
             chapterAssignments: updatedAssignments,
+            activitySessions: updatedSessions,
+            activeTimer: shouldStopTimer ? undefined : state.activeTimer
           };
         }),
         
@@ -1966,10 +1985,13 @@ export const useStore = create<Store>()(
 
       cleanupSessions: () =>
         set((state) => {
-          // Manual cleanup triggered
+          // Manual cleanup triggered - also resets any orphaned timers
           if (!state.currentUserId) return state;
           
           const cleanedSessions = cleanupCorruptedSessions(state.activitySessions || []);
+          
+          // Check if we have any active sessions left
+          const hasActiveSessions = cleanedSessions.some(s => s.isActive);
           
           return {
             userData: {
@@ -1977,9 +1999,12 @@ export const useStore = create<Store>()(
               [state.currentUserId]: {
                 ...state.userData[state.currentUserId],
                 activitySessions: cleanedSessions,
+                // Reset timer if no active sessions remain
+                activeTimer: hasActiveSessions ? state.userData[state.currentUserId]?.activeTimer : undefined
               }
             },
             activitySessions: cleanedSessions,
+            activeTimer: hasActiveSessions ? state.activeTimer : undefined
           };
         }),
       
@@ -2196,24 +2221,118 @@ export const useStore = create<Store>()(
         const state = get();
         return validateDataIntegrity(state);
       },
+
+      resetActiveSessionsAndTimers: () =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          // End all active sessions and reset timers
+          const updatedSessions = (state.activitySessions || []).map(session => ({
+            ...session,
+            isActive: false,
+            endTime: session.isActive && !session.endTime ? new Date().toISOString() : session.endTime
+          }));
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                activitySessions: updatedSessions,
+                activeTimer: undefined
+              }
+            },
+            activitySessions: updatedSessions,
+            activeTimer: undefined
+          };
+        }),
+
+      validateAndFixSessionState: () =>
+        set((state) => {
+          if (!state.currentUserId) return state;
+          
+          const today = new Date().toISOString().split('T')[0];
+          const assignments = state.chapterAssignments || [];
+          const todayAssignments = assignments.filter(a => a.date === today);
+          const todayAssignmentIds = new Set(todayAssignments.map(a => a.id));
+          
+          // Clean up sessions that don't have matching assignments for today
+          const validSessions = (state.activitySessions || []).filter(session => {
+            // Keep only sessions for today's assignments
+            if (!todayAssignmentIds.has(session.assignmentId)) {
+              // End the session if it was active
+              if (session.isActive) {
+                return false; // Remove this session
+              }
+            }
+            return true;
+          });
+          
+          // Check if we have any active sessions left
+          const hasActiveSessions = validSessions.some(s => s.isActive);
+          
+          // If timer is running but no active sessions, stop the timer
+          const shouldResetTimer = state.activeTimer?.isRunning && !hasActiveSessions;
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                activitySessions: validSessions,
+                activeTimer: shouldResetTimer ? undefined : state.userData[state.currentUserId]?.activeTimer
+              }
+            },
+            activitySessions: validSessions,
+            activeTimer: shouldResetTimer ? undefined : state.activeTimer
+          };
+        }),
       };
     },
     {
       name: 'study-planner-storage',
       onRehydrateStorage: () => (state) => {
-        // Clean up corrupted sessions on app load
-        if (state && state.activitySessions) {
-          // Cleaning up sessions on rehydration
-          const cleanedSessions = cleanupCorruptedSessions(state.activitySessions);
-          if (cleanedSessions.length !== state.activitySessions.length || 
-              JSON.stringify(cleanedSessions) !== JSON.stringify(state.activitySessions)) {
-            state.activitySessions = cleanedSessions;
+        // Clean up corrupted sessions and validate state on app load
+        if (state) {
+          const today = new Date().toISOString().split('T')[0];
+          
+          // Clean up corrupted sessions
+          if (state.activitySessions) {
+            const cleanedSessions = cleanupCorruptedSessions(state.activitySessions);
             
-            // Also update userData if current user exists
-            if (state.currentUserId && state.userData[state.currentUserId]) {
-              state.userData[state.currentUserId].activitySessions = cleanedSessions;
+            // Further validation: remove sessions for non-existent assignments
+            const assignments = state.chapterAssignments || [];
+            const assignmentIds = new Set(assignments.map(a => a.id));
+            
+            const validSessions = cleanedSessions.filter(session => {
+              // Keep session only if its assignment still exists
+              return assignmentIds.has(session.assignmentId);
+            });
+            
+            // Check if there are any active sessions for today's assignments
+            const todayAssignments = assignments.filter(a => a.date === today);
+            const todayAssignmentIds = new Set(todayAssignments.map(a => a.id));
+            const hasValidActiveSession = validSessions.some(
+              s => s.isActive && todayAssignmentIds.has(s.assignmentId)
+            );
+            
+            // Update sessions
+            state.activitySessions = validSessions;
+            
+            // Reset timer if no valid active sessions
+            if (!hasValidActiveSession && state.activeTimer?.isRunning) {
+              state.activeTimer = undefined;
             }
-            // Sessions cleaned up successfully
+            
+            // Update userData if current user exists
+            if (state.currentUserId && state.userData[state.currentUserId]) {
+              state.userData[state.currentUserId].activitySessions = validSessions;
+              if (!hasValidActiveSession) {
+                state.userData[state.currentUserId].activeTimer = undefined;
+              }
+            }
+            
+            console.log('Session state validated on app load');
           }
         }
       },
