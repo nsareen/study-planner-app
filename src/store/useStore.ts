@@ -1204,18 +1204,10 @@ export const useStore = create<Store>()(
       
       resumeActivity: (sessionId) =>
         set((state) => {
-          console.log('Store resumeActivity called with sessionId:', sessionId);
-          if (!state.currentUserId) {
-            console.error('No current user');
-            return state;
-          }
+          if (!state.currentUserId) return state;
           
           const session = state.activitySessions?.find(s => s.sessionId === sessionId);
-          console.log('Found session:', session);
-          if (!session || session.isActive) {
-            console.error('Session not found or already active', { session, isActive: session?.isActive });
-            return state;
-          }
+          if (!session || session.isActive) return state;
           
           const resumedAt = new Date().toISOString();
           

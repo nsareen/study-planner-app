@@ -319,7 +319,7 @@ const TodayPlan: React.FC = () => {
                               <Play size={16} />
                               Resume
                             </button>
-                          ))
+                          )}
                           
                           {isActive && (
                             <button
