@@ -445,6 +445,19 @@ Your current data will be replaced. Continue?`;
                 Check Data Integrity
               </button>
               
+              <button
+                onClick={() => {
+                  if (window.confirm('This will clean up any corrupted timer sessions and remove old data. Continue?')) {
+                    useStore.getState().cleanupSessions();
+                    alert('Sessions cleaned up successfully! If you had a stuck timer, it should be fixed now.');
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                <AlertTriangle size={18} />
+                Fix Stuck Timers
+              </button>
+              
               {integrityCheckResult && (
                 <div className={`p-4 rounded-lg ${
                   integrityCheckResult.isValid 

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import type { Chapter, PlannerDay } from '../types';
 import { format, addDays, startOfDay, isSameDay, isWeekend } from 'date-fns';
+import { calculateChapterProgress } from '../utils/progressCalculations';
 import PlannerTutorial from '../components/PlannerTutorial';
 import MatrixPlannerView from '../components/MatrixPlannerView';
 import EnhancedMatrixEditor from '../components/EnhancedMatrixEditor';
@@ -82,19 +83,19 @@ const SmartPlanner: React.FC = () => {
     }
   }, [exams, offDays, addPlannerDay, getPlannerDayByDate]);
 
-  // Calculate stats
+  // Calculate stats using centralized progress calculation
+  const progressData = calculateChapterProgress(chapters);
+  
   const stats = {
-    totalChapters: chapters.length,
-    completedChapters: chapters.filter(c => c.studyStatus === 'done' && c.revisionStatus === 'done').length,
+    totalChapters: progressData.totalChapters,
+    completedChapters: progressData.inProgressChapters, // Use chapters with at least one activity done
     totalStudyHours: chapters.reduce((sum, c) => sum + (c.studyHours || 0), 0),
     totalRevisionHours: chapters.reduce((sum, c) => sum + (c.revisionHours || 0), 0),
     completedStudyHours: chapters.reduce((sum, c) => sum + (c.completedStudyHours || 0), 0),
     completedRevisionHours: chapters.reduce((sum, c) => sum + (c.completedRevisionHours || 0), 0),
   };
   
-  const progressPercentage = stats.totalChapters > 0 
-    ? Math.round((stats.completedChapters / stats.totalChapters) * 100)
-    : 0;
+  const progressPercentage = progressData.progressPercentage;
 
   // Get next exam
   const nextExam = exams

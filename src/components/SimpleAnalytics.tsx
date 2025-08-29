@@ -10,6 +10,7 @@ import {
   Zap
 } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
+import { calculateChapterProgress, getProgressMessage } from '../utils/progressCalculations';
 import type { Chapter, ChapterAssignment, Exam } from '../types';
 
 interface SimpleAnalyticsProps {
@@ -27,13 +28,11 @@ const SimpleAnalytics: React.FC<SimpleAnalyticsProps> = ({
   currentStreak = 0,
   level = 1
 }) => {
-  // Calculate simple metrics
-  const totalChapters = chapters.length;
-  const completedChapters = chapters.filter(c => 
-    c.studyStatus === 'done' || c.revisionStatus === 'done'
-  ).length;
-  const progressPercentage = totalChapters > 0 ? 
-    Math.round((completedChapters / totalChapters) * 100) : 0;
+  // Calculate simple metrics using centralized function
+  const progressData = calculateChapterProgress(chapters);
+  const totalChapters = progressData.totalChapters;
+  const completedChapters = progressData.inProgressChapters;
+  const progressPercentage = progressData.progressPercentage;
 
   // Get next exam
   const upcomingExams = exams
@@ -88,15 +87,8 @@ const SimpleAnalytics: React.FC<SimpleAnalyticsProps> = ({
     .sort((a, b) => new Date(b.completedAt || b.date).getTime() - new Date(a.completedAt || a.date).getTime())
     .slice(0, 3);
 
-  // Get motivational message based on progress
-  const getMotivationalMessage = () => {
-    if (progressPercentage === 0) return "Let's get started! 🚀";
-    if (progressPercentage < 25) return "Great beginning! Keep going! 💪";
-    if (progressPercentage < 50) return "You're doing awesome! 🌟";
-    if (progressPercentage < 75) return "Amazing progress! Almost there! 🎯";
-    if (progressPercentage < 100) return "So close to finishing! You got this! 🏆";
-    return "Champion! All done! 🎉";
-  };
+  // Get motivational message using centralized function
+  const motivationalMessage = getProgressMessage(progressPercentage);
 
   // Visual progress bar component
   const ProgressBar = ({ value, max, color = "blue" }: { value: number; max: number; color?: string }) => {
@@ -131,7 +123,7 @@ const SimpleAnalytics: React.FC<SimpleAnalyticsProps> = ({
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-2xl font-bold mb-1">Your Progress</h2>
-            <p className="text-white/80 text-lg">{getMotivationalMessage()}</p>
+            <p className="text-white/80 text-lg">{motivationalMessage}</p>
           </div>
           <div className="text-right">
             <div className="text-4xl font-bold">{completedChapters}/{totalChapters}</div>

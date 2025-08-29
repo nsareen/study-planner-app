@@ -84,6 +84,7 @@ interface StoreActions {
   setCurrentDate: (date: string) => void;
   clearAllData: () => void;
   clearAllChapters: () => void;
+  cleanupSessions: () => void;
   importData: (data: any) => boolean;
   cleanupOrphanedData: () => void;
   validateDataIntegrity: () => { isValid: boolean; issues: string[] };
@@ -174,6 +175,47 @@ const getInitialUsers = (): UserProfile[] => [
     lastActive: '2025-01-01T00:00:00.000Z',
   },
 ];
+
+// Helper function to validate and clean up corrupted sessions
+const cleanupCorruptedSessions = (sessions: ActivitySession[]): ActivitySession[] => {
+  const now = new Date();
+  const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  
+  return sessions.map(session => {
+    // Clean up old sessions that are still marked as active
+    const sessionStart = new Date(session.startTime);
+    if (sessionStart < oneDayAgo && !session.endTime) {
+      // Auto-completing old session
+      return {
+        ...session,
+        isActive: false,
+        endTime: new Date(sessionStart.getTime() + 4 * 60 * 60 * 1000).toISOString(), // Auto-complete after 4 hours
+      };
+    }
+    
+    // Fix sessions with inconsistent state
+    const lastPauseInterval = session.pausedIntervals[session.pausedIntervals.length - 1];
+    if (lastPauseInterval && !lastPauseInterval.resumedAt && session.isActive) {
+      // Session is marked active but has an unresumed pause - fix it
+      // Fixing inconsistent session state
+      return {
+        ...session,
+        isActive: false,
+      };
+    }
+    
+    return session;
+  }).filter(session => {
+    // Remove sessions older than 7 days
+    const sessionStart = new Date(session.startTime);
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    if (sessionStart < sevenDaysAgo) {
+      // Removing old session
+      return false;
+    }
+    return true;
+  });
+};
 
 export const useStore = create<Store>()(
   persist(
@@ -276,6 +318,9 @@ export const useStore = create<Store>()(
           activeTimer: undefined,
         };
         
+        // Clean up corrupted sessions before switching
+        const cleanedSessions = cleanupCorruptedSessions(userData.activitySessions || []);
+        
         set({
           currentUserId: userId,
           exams: userData.exams,
@@ -288,7 +333,7 @@ export const useStore = create<Store>()(
           activeStudyPlanId: userData.activeStudyPlanId,
           plannerDays: userData.plannerDays || [],
           chapterAssignments: userData.chapterAssignments || [],
-          activitySessions: userData.activitySessions || [],
+          activitySessions: cleanedSessions,
           activeTimer: userData.activeTimer,
         });
         
@@ -1163,14 +1208,45 @@ export const useStore = create<Store>()(
       
       pauseActivity: (sessionId) =>
         set((state) => {
+          // pauseActivity called
           if (!state.currentUserId) return state;
           
           const session = state.activitySessions?.find(s => s.sessionId === sessionId);
-          if (!session || !session.isActive) return state;
+          // Found session to pause
+          
+          // Fixed: Allow pausing even if state shows not active (to fix corrupted state)
+          if (!session) {
+            // Session not found
+            return state;
+          }
+          
+          // Check if already paused (last interval has no resumedAt)
+          const lastInterval = session.pausedIntervals[session.pausedIntervals.length - 1];
+          if (lastInterval && !lastInterval.resumedAt) {
+            // Session is already paused
+            // Fix the isActive flag if it's wrong
+            if (session.isActive) {
+              const fixedSessions = state.activitySessions.map(s =>
+                s.sessionId === sessionId ? { ...s, isActive: false } : s
+              );
+              return {
+                ...state,
+                activitySessions: fixedSessions,
+                userData: {
+                  ...state.userData,
+                  [state.currentUserId]: {
+                    ...state.userData[state.currentUserId],
+                    activitySessions: fixedSessions
+                  }
+                }
+              };
+            }
+            return state;
+          }
           
           const pausedAt = new Date().toISOString();
           
-          // Update session with paused interval
+          // Update session with paused interval and ensure isActive is false
           const updatedSessions = state.activitySessions.map(s =>
             s.sessionId === sessionId
               ? {
@@ -1180,6 +1256,8 @@ export const useStore = create<Store>()(
                 }
               : s
           );
+          
+          // Session paused successfully
           
           // Update assignment status to paused
           const updatedAssignments = state.chapterAssignments.map(a =>
@@ -1204,10 +1282,25 @@ export const useStore = create<Store>()(
       
       resumeActivity: (sessionId) =>
         set((state) => {
-          if (!state.currentUserId) return state;
+          // resumeActivity called
+          if (!state.currentUserId) {
+            // No current user
+            return state;
+          }
           
           const session = state.activitySessions?.find(s => s.sessionId === sessionId);
-          if (!session || session.isActive) return state;
+          // Found session to resume
+          if (!session) {
+            // Session not found
+            return state;
+          }
+          
+          // Check if already active
+          const lastInterval = session.pausedIntervals[session.pausedIntervals.length - 1];
+          if (session.isActive && (!lastInterval || lastInterval.resumedAt)) {
+            // Session is already active
+            return state;
+          }
           
           const resumedAt = new Date().toISOString();
           
@@ -1215,6 +1308,7 @@ export const useStore = create<Store>()(
           const updatedSessions = state.activitySessions.map(s => {
             if (s.sessionId === sessionId) {
               const intervals = [...s.pausedIntervals];
+              // Only update if there's an unresumed pause interval
               if (intervals.length > 0 && !intervals[intervals.length - 1].resumedAt) {
                 intervals[intervals.length - 1] = {
                   ...intervals[intervals.length - 1],
@@ -1222,6 +1316,7 @@ export const useStore = create<Store>()(
                   duration: Math.floor((new Date(resumedAt).getTime() - new Date(intervals[intervals.length - 1].pausedAt).getTime()) / 60000)
                 };
               }
+              // Always ensure isActive is true when resuming
               return { ...s, isActive: true, pausedIntervals: intervals };
             }
             return s;
@@ -1231,6 +1326,8 @@ export const useStore = create<Store>()(
           const updatedAssignments = state.chapterAssignments.map(a =>
             a.id === session.assignmentId ? { ...a, status: 'in-progress' as const, pausedAt: undefined } : a
           );
+          
+          // Resume successful
           
           return {
             userData: {
@@ -1329,12 +1426,33 @@ export const useStore = create<Store>()(
         
         // Find the current session (active or paused, but not completed)
         const sessions = state.activitySessions || [];
+        
         // First try to find an active session
         const activeSession = sessions.find(s => s.isActive);
-        if (activeSession) return activeSession;
+        if (activeSession) {
+          // Check if this session is corrupted (has all paused intervals resumed but still shows as active)
+          const allIntervalsResumed = activeSession.pausedIntervals.length > 0 && 
+            activeSession.pausedIntervals.every(interval => interval.resumedAt);
+          
+          if (allIntervalsResumed) {
+            // Session should be active if all intervals are resumed
+            // Active session found with all intervals resumed
+          }
+          return activeSession;
+        }
         
-        // If no active session, find a paused session (has no endTime)
-        return sessions.find(s => !s.endTime && !s.isActive);
+        // If no active session, find a paused session (has no endTime and is not active)
+        const pausedSession = sessions.find(s => !s.endTime && !s.isActive);
+        if (pausedSession) {
+          // Check if this is actually paused (has an unresumed pause interval)
+          const hasUnresumedPause = pausedSession.pausedIntervals.some(interval => !interval.resumedAt);
+          if (hasUnresumedPause) {
+            // Paused session found
+            return pausedSession;
+          }
+        }
+        
+        return undefined;
       },
       
       // Timer actions
@@ -1527,6 +1645,25 @@ export const useStore = create<Store>()(
           };
         }),
 
+      cleanupSessions: () =>
+        set((state) => {
+          // Manual cleanup triggered
+          if (!state.currentUserId) return state;
+          
+          const cleanedSessions = cleanupCorruptedSessions(state.activitySessions || []);
+          
+          return {
+            userData: {
+              ...state.userData,
+              [state.currentUserId]: {
+                ...state.userData[state.currentUserId],
+                activitySessions: cleanedSessions,
+              }
+            },
+            activitySessions: cleanedSessions,
+          };
+        }),
+      
       clearAllChapters: () =>
         set((state) => {
           if (!state.currentUserId) return state;
@@ -1687,6 +1824,23 @@ export const useStore = create<Store>()(
     },
     {
       name: 'study-planner-storage',
+      onRehydrateStorage: () => (state) => {
+        // Clean up corrupted sessions on app load
+        if (state && state.activitySessions) {
+          // Cleaning up sessions on rehydration
+          const cleanedSessions = cleanupCorruptedSessions(state.activitySessions);
+          if (cleanedSessions.length !== state.activitySessions.length || 
+              JSON.stringify(cleanedSessions) !== JSON.stringify(state.activitySessions)) {
+            state.activitySessions = cleanedSessions;
+            
+            // Also update userData if current user exists
+            if (state.currentUserId && state.userData[state.currentUserId]) {
+              state.userData[state.currentUserId].activitySessions = cleanedSessions;
+            }
+            // Sessions cleaned up successfully
+          }
+        }
+      },
     }
   )
 );
