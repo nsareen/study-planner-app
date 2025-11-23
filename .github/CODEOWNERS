@@ -1,0 +1,42 @@
+# Code Owners for Study Planner App
+#
+# These owners will be automatically requested for review when someone opens a pull request.
+# More information: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @nsareen
+
+# Frontend Components
+/src/components/ @nsareen
+/src/pages/ @nsareen
+
+# State Management (Critical - requires careful review)
+/src/store/ @nsareen
+
+# Type Definitions (Breaking changes impact)
+/src/types/ @nsareen
+
+# Utilities and Business Logic
+/src/utils/ @nsareen
+
+# Tests (Must maintain coverage)
+/tests/ @nsareen
+
+# Documentation (Must stay up to date)
+/docs/ @nsareen
+*.md @nsareen
+
+# Configuration Files (Deployment impact)
+/vercel.json @nsareen
+/vite.config.ts @nsareen
+/tailwind.config.js @nsareen
+/tsconfig.json @nsareen
+/package.json @nsareen
+
+# GitHub Workflows and Templates
+/.github/ @nsareen
+
+# Root Configuration
+/CLAUDE.md @nsareen
+/PROGRESS.md @nsareen
+/CONTRIBUTING.md @nsareen
