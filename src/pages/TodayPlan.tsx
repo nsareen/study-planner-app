@@ -15,33 +15,31 @@ const motivationalMessages = [
 ];
 
 const TodayPlan: React.FC = () => {
-  const {
-    chapters,
-    chapterAssignments,
-    activitySessions,
-    startActivity,
-    pauseActivity,
-    resumeActivity,
-    completeActivity,
-    getActiveSession
-  } = useStore();
+  const chapters = useStore((state) => state.getChapters());
+  const chapterAssignments = useStore((state) => state.getChapterAssignments());
+  const activitySessions = useStore((state) => state.getActivitySessions());
+  const startActivity = useStore((state) => state.startActivity);
+  const pauseActivity = useStore((state) => state.pauseActivity);
+  const resumeActivity = useStore((state) => state.resumeActivity);
+  const completeActivity = useStore((state) => state.completeActivity);
+  const getActiveSession = useStore((state) => state.getActiveSession);
   
   const [timer, setTimer] = useState<{ [key: string]: number }>({});
   const [motivationalMessage, setMotivationalMessage] = useState(motivationalMessages[0]);
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   
   // Get only today's scheduled assignments
-  const todaysAssignments = chapterAssignments.filter(a => a.date === todayStr);
+  const todaysAssignments = chapterAssignments.filter((a: any) => a.date === todayStr);
   const activeSession = getActiveSession();
-  
+
   // Calculate overall progress
   const totalTasks = todaysAssignments.length;
-  const completedTasks = todaysAssignments.filter(a => a.status === 'completed').length;
-  const inProgressTasks = todaysAssignments.filter(a => a.status === 'in-progress').length;
+  const completedTasks = todaysAssignments.filter((a: any) => a.status === 'completed').length;
+  const inProgressTasks = todaysAssignments.filter((a: any) => a.status === 'in-progress').length;
   const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  
-  const totalPlannedMinutes = todaysAssignments.reduce((sum, a) => sum + a.plannedMinutes, 0);
-  const totalActualMinutes = todaysAssignments.reduce((sum, a) => sum + (a.actualMinutes || 0), 0);
+
+  const totalPlannedMinutes = todaysAssignments.reduce((sum: any, a: any) => sum + a.plannedMinutes, 0);
+  const totalActualMinutes = todaysAssignments.reduce((sum: any, a: any) => sum + (a.actualMinutes || 0), 0);
   
   useEffect(() => {
     const interval = setInterval(() => {
@@ -139,7 +137,7 @@ const TodayPlan: React.FC = () => {
   };
   
   const getChapterForAssignment = (assignment: typeof todaysAssignments[0]) => {
-    return chapters.find(c => c.id === assignment.chapterId);
+    return chapters.find((c: any) => c.id === assignment.chapterId);
   };
   
   const getPriorityLabel = (priority: number) => {
@@ -228,7 +226,7 @@ const TodayPlan: React.FC = () => {
                       <p className="text-sm opacity-90 mb-1">Currently Working On</p>
                       <h3 className="text-2xl font-bold">
                         {(() => {
-                          const assignment = todaysAssignments.find(a => a.id === activeSession.assignmentId);
+                          const assignment = todaysAssignments.find((a: any) => a.id === activeSession.assignmentId);
                           return assignment ? getChapterForAssignment(assignment)?.name : 'Activity';
                         })() || 'Activity'}
                       </h3>
@@ -241,7 +239,7 @@ const TodayPlan: React.FC = () => {
               )}
               
               {/* Task Cards */}
-              {todaysAssignments.map((assignment) => {
+              {todaysAssignments.map((assignment: any) => {
                 const chapter = getChapterForAssignment(assignment);
                 const priorityInfo = getPriorityLabel(0.5); // Default medium priority
                 const isActive = activeSession?.assignmentId === assignment.id && activeSession?.isActive;

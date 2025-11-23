@@ -7,12 +7,14 @@ import Tutorial from './Tutorial';
 import SyncIndicator from './SyncIndicator';
 
 const Layout: React.FC = () => {
-  const { getCurrentUser, logoutUser, settings } = useStore();
+  const getCurrentUser = useStore((state) => state.getCurrentUser);
+  const logoutUser = useStore((state) => state.logoutUser);
+  const settings = useStore((state) => state.getSettings());
   const currentUser = getCurrentUser();
   const location = useLocation();
   const [currentTheme, setCurrentTheme] = useState(getTheme(settings.colorTheme || 'default'));
   const [showTutorial, setShowTutorial] = useState(false);
-  
+
   useEffect(() => {
     setCurrentTheme(getTheme(settings.colorTheme || 'default'));
   }, [settings.colorTheme]);

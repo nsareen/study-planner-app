@@ -7,7 +7,11 @@ import SmartChapterSuggest from '../components/SmartChapterSuggest';
 import ConfirmDialog, { useConfirmDialog } from '../components/ConfirmDialog';
 
 const Subjects: React.FC = () => {
-  const { chapters, addChapter, updateChapter, deleteChapter, clearAllChapters } = useStore();
+  const chapters = useStore((state) => state.getChapters());
+  const addChapter = useStore((state) => state.addChapter);
+  const updateChapter = useStore((state) => state.updateChapter);
+  const deleteChapter = useStore((state) => state.deleteChapter);
+  const clearAllChapters = useStore((state) => state.clearAllChapters);
   const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCurriculumImport, setShowCurriculumImport] = useState(false);
@@ -280,7 +284,7 @@ const Subjects: React.FC = () => {
           <div className="space-y-6">
             {subjects.map((subject) => {
               const stats = subjectStats.get(subject)!;
-              const subjectChapters = chapters.filter((ch) => ch.subject === subject);
+              const subjectChapters = chapters.filter((ch: any) => ch.subject === subject);
               const progressPercentage = getProgressPercentage(stats.completedHours, stats.totalHours);
               
               return (
@@ -302,7 +306,7 @@ const Subjects: React.FC = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    {subjectChapters.map((chapter) => (
+                    {subjectChapters.map((chapter: any) => (
                       <div
                         key={chapter.id}
                         className="flex items-center justify-between p-2 hover:bg-gray-50 rounded"

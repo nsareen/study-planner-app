@@ -11,35 +11,33 @@ import { format, differenceInDays, parseISO } from 'date-fns';
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const {
-    chapters,
-    exams,
-    examGroups,
-    studyPlans,
-    activeStudyPlanId,
-    currentUserId,
-    users
-  } = useStore();
+  const chapters = useStore((state) => state.getChapters());
+  const exams = useStore((state) => state.getExams());
+  const examGroups = useStore((state) => state.getExamGroups());
+  const studyPlans = useStore((state) => state.getStudyPlans());
+  const activeStudyPlanId = useStore((state) => state.getActiveStudyPlanId());
+  const currentUserId = useStore((state) => state.currentUserId);
+  const users = useStore((state) => state.users);
 
-  const currentUser = users.find(u => u.id === currentUserId);
-  const activePlan = studyPlans?.find(p => p.id === activeStudyPlanId);
+  const currentUser = users.find((u: any) => u.id === currentUserId);
+  const activePlan = studyPlans?.find((p: any) => p.id === activeStudyPlanId);
   
   // Calculate statistics
   const totalChapters = chapters.length;
-  const completedChapters = chapters.filter(c => c.studyStatus === 'done').length;
-  const inProgressChapters = chapters.filter(c => c.studyStatus === 'in-progress').length;
-  const totalStudyHours = chapters.reduce((sum, c) => sum + (c.studyHours || 2), 0);
-  const completedHours = chapters.reduce((sum, c) => sum + (c.completedStudyHours || 0), 0);
+  const completedChapters = chapters.filter((c: any) => c.studyStatus === 'done').length;
+  const inProgressChapters = chapters.filter((c: any) => c.studyStatus === 'in-progress').length;
+  const totalStudyHours = chapters.reduce((sum: any, c: any) => sum + (c.studyHours || 2), 0);
+  const completedHours = chapters.reduce((sum: any, c: any) => sum + (c.completedStudyHours || 0), 0);
   const progressPercentage = totalChapters > 0 ? Math.round((completedChapters / totalChapters) * 100) : 0;
-  
+
   // Get upcoming exams
   const upcomingExams = exams
-    .filter(e => new Date(e.date) >= new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .filter((e: any) => new Date(e.date) >= new Date())
+    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 3);
-  
+
   // Get active exam groups
-  const activeExamGroups = examGroups?.filter(eg => eg.status === 'applied') || [];
+  const activeExamGroups = examGroups?.filter((eg: any) => eg.status === 'applied') || [];
 
   const quickActions = [
     {
@@ -58,7 +56,7 @@ const Dashboard: React.FC = () => {
       color: 'from-blue-500 to-cyan-500',
       onClick: () => navigate('/planner?view=editor'),
       stats: `${totalChapters} chapters`,
-      highlight: `${Object.keys(chapters.reduce((acc, c) => ({ ...acc, [c.subject]: true }), {})).length} subjects`
+      highlight: `${Object.keys(chapters.reduce((acc: any, c: any) => ({ ...acc, [c.subject]: true }), {})).length} subjects`
     },
     {
       title: 'Matrix View',
@@ -232,7 +230,7 @@ const Dashboard: React.FC = () => {
               Upcoming Exams
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {upcomingExams.map(exam => {
+              {upcomingExams.map((exam: any) => {
                 const daysLeft = differenceInDays(parseISO(exam.date), new Date());
                 return (
                   <div

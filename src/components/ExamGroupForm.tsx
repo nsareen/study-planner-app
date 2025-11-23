@@ -17,10 +17,10 @@ const ExamGroupForm: React.FC<ExamGroupFormProps> = ({
   editingGroup = null, 
   mode = 'create' 
 }) => {
-  const { chapters } = useStore();
-  
+  const chapters = useStore((state) => state.getChapters());
+
   // Get unique subjects from chapters
-  const availableSubjects = Array.from(new Set(chapters.map(c => c.subject))).sort();
+  const availableSubjects = Array.from(new Set(chapters.map((c: any) => c.subject))).sort();
   
   // Initialize form data based on mode and editing group
   const getInitialFormData = () => {
