@@ -1351,24 +1351,41 @@ export const useStore = create<Store>()(
       deleteAssignment: (id) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
+
+          // Get the assignment before deleting to know which plan it belongs to
+          const assignmentToDelete = state.getChapterAssignments()?.find(a => a.id === id);
+
           // Check if this assignment has an active timer/session
           const activeSession = state.getActivitySessions()?.find(
             s => s.assignmentId === id && s.isActive
           );
-          
+
           const updatedAssignments = (state.getChapterAssignments() || []).filter(
             (assignment) => assignment.id !== id
           );
-          
+
           // Clean up any active sessions for this assignment
           const updatedSessions = state.getActivitySessions()?.filter(
             s => s.assignmentId !== id
           ) || [];
-          
+
           // Stop timer if this assignment was being tracked
           const shouldStopTimer = activeSession !== undefined;
-          
+
+          // FIX: Remove assignment ID from plan's assignmentIds array (bidirectional link cleanup)
+          const updatedPlans = assignmentToDelete?.planId
+            ? (state.getStudyPlans() || []).map(plan => {
+                if (plan.id === assignmentToDelete.planId) {
+                  return {
+                    ...plan,
+                    assignmentIds: (plan.assignmentIds || []).filter(aid => aid !== id),
+                    updatedAt: new Date().toISOString()
+                  };
+                }
+                return plan;
+              })
+            : state.getStudyPlans();
+
           return {
             userData: {
               ...state.userData,
@@ -1376,6 +1393,7 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 chapterAssignments: updatedAssignments,
                 activitySessions: updatedSessions,
+                studyPlans: updatedPlans,
                 activeTimer: shouldStopTimer ? undefined : state.userData[state.currentUserId]?.activeTimer
               }
             },
