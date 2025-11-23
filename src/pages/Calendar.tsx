@@ -7,10 +7,13 @@ import ExamGroupForm from '../components/ExamGroupForm';
 import ConfirmDialog, { useConfirmDialog } from '../components/ConfirmDialog';
 
 const Calendar: React.FC = () => {
-  const { 
-    exams, examGroups, offDays, chapters, 
+  const exams = useStore((state) => state.getExams());
+  const examGroups = useStore((state) => state.getExamGroups());
+  const offDays = useStore((state) => state.getOffDays());
+  const chapters = useStore((state) => state.getChapters());
+  const {
     addExam, deleteExam, addExamGroup, updateExamGroup, deleteExamGroup, applyExamGroup,
-    addOffDay, deleteOffDay, currentDate 
+    addOffDay, deleteOffDay, currentDate
   } = useStore();
   const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
   const [showExamForm, setShowExamForm] = useState(false);

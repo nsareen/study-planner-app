@@ -326,13 +326,13 @@ export interface ActivitySession {
 }
 
 export interface TimerState {
-  isRunning: boolean;
-  isPaused: boolean;
-  elapsedTime: number; // seconds
-  plannedTime: number; // seconds
-  overtimeAllowed: boolean;
-  warningShown: boolean;
-  completionAlertShown: boolean;
+  sessionId: string;
+  assignmentId: string;
+  startTime: number; // epoch ms
+  totalPausedMs: number; // accumulated pause duration
+  currentPauseStart?: number; // if paused, when pause started
+  isActive: boolean;
+  plannedMinutes?: number; // optional for tracking planned time
 }
 
 export interface AppState {

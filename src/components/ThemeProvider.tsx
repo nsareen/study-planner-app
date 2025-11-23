@@ -7,7 +7,7 @@ interface ThemeProviderProps {
 }
 
 const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  const { settings } = useStore();
+  const settings = useStore((state) => state.getSettings());
   const currentTheme = getTheme(settings.colorTheme || 'default');
 
   useEffect(() => {

@@ -5,16 +5,14 @@ import DetailedAnalytics from '../components/DetailedAnalytics';
 import { Lock, Unlock, Eye, EyeOff } from 'lucide-react';
 
 const Progress: React.FC = () => {
-  const { 
-    chapters, 
-    exams,
-    chapterAssignments,
-    activitySessions,
-    dailyLogs,
-    getCurrentUser,
-    settings,
-    updateSettings
-  } = useStore();
+  const chapters = useStore((state) => state.getChapters());
+  const exams = useStore((state) => state.getExams());
+  const chapterAssignments = useStore((state) => state.getChapterAssignments());
+  const activitySessions = useStore((state) => state.getActivitySessions());
+  const dailyLogs = useStore((state) => state.getDailyLogs());
+  const getCurrentUser = useStore((state) => state.getCurrentUser);
+  const settings = useStore((state) => state.getSettings());
+  const updateSettings = useStore((state) => state.updateSettings);
   
   const currentUser = getCurrentUser();
   const [showPinDialog, setShowPinDialog] = useState(false);

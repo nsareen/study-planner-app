@@ -6,25 +6,23 @@ import ConfirmDialog, { useConfirmDialog } from '../components/ConfirmDialog';
 import { prepareExportData, validateImportData } from '../store/dataSync';
 
 const Settings: React.FC = () => {
-  const { 
-    settings, 
-    updateSettings, 
-    clearAllData, 
-    importData, 
-    chapters, 
-    exams, 
-    examGroups, 
-    offDays, 
-    dailyLogs, 
-    studyPlans, 
-    cleanupOrphanedData, 
-    validateDataIntegrity,
-    resetActiveSessionsAndTimers,
-    validateAndFixSessionState,
-    cleanupSessions,
-    activitySessions,
-    activeTimer
-  } = useStore();
+  const settings = useStore((state) => state.getSettings());
+  const updateSettings = useStore((state) => state.updateSettings);
+  const clearAllData = useStore((state) => state.clearAllData);
+  const importData = useStore((state) => state.importData);
+  const chapters = useStore((state) => state.getChapters());
+  const exams = useStore((state) => state.getExams());
+  const examGroups = useStore((state) => state.getExamGroups());
+  const offDays = useStore((state) => state.getOffDays());
+  const dailyLogs = useStore((state) => state.getDailyLogs());
+  const studyPlans = useStore((state) => state.getStudyPlans());
+  const cleanupOrphanedData = useStore((state) => state.cleanupOrphanedData);
+  const validateDataIntegrity = useStore((state) => state.validateDataIntegrity);
+  const resetActiveSessionsAndTimers = useStore((state) => state.resetActiveSessionsAndTimers);
+  const validateAndFixSessionState = useStore((state) => state.validateAndFixSessionState);
+  const cleanupSessions = useStore((state) => state.cleanupSessions);
+  const activitySessions = useStore((state) => state.getActivitySessions());
+  const activeTimer = useStore((state) => state.getActiveTimer());
   const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
   const [showPinChange, setShowPinChange] = useState(false);
   const [currentPin, setCurrentPin] = useState('');
@@ -556,13 +554,13 @@ Your current data will be replaced. Continue?`;
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">Active Sessions</span>
                   <span className="text-sm text-gray-600">
-                    {activitySessions?.filter(s => s.isActive).length || 0} active
+                    {activitySessions?.filter((s: any) => s.isActive).length || 0} active
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Timer Status</span>
-                  <span className={`text-sm font-medium ${activeTimer?.isRunning ? 'text-green-600' : 'text-gray-600'}`}>
-                    {activeTimer?.isRunning ? 'Running' : 'Stopped'}
+                  <span className={`text-sm font-medium ${activeTimer?.isActive ? 'text-green-600' : 'text-gray-600'}`}>
+                    {activeTimer?.isActive ? 'Running' : 'Stopped'}
                   </span>
                 </div>
               </div>

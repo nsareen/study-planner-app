@@ -79,6 +79,7 @@ interface StoreActions {
   // Timer actions (NEW)
   updateTimerState: (updates: Partial<TimerState>) => void;
   resetTimer: () => void;
+  getElapsedTime: (assignmentId?: string) => number; // Returns elapsed time in seconds
   
   // Settings actions
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -100,19 +101,19 @@ interface StoreActions {
   validateDataIntegrity: () => { isValid: boolean; issues: string[] };
   validateAndFixSessionState: () => void;
   
-  // Helper getters for current user data
-  exams: Exam[];
-  examGroups: ExamGroup[];
-  offDays: OffDay[];
-  chapters: Chapter[];
-  dailyLogs: DailyLog[];
-  settings: AppSettings;
-  studyPlans: StudyPlan[];
-  activeStudyPlanId?: string;
-  plannerDays: PlannerDay[];
-  chapterAssignments: ChapterAssignment[];
-  activitySessions: ActivitySession[];
-  activeTimer?: TimerState;
+  // Computed getters for current user data (replacing dual state tracking)
+  getExams: () => Exam[];
+  getExamGroups: () => ExamGroup[];
+  getOffDays: () => OffDay[];
+  getChapters: () => Chapter[];
+  getDailyLogs: () => DailyLog[];
+  getSettings: () => AppSettings;
+  getStudyPlans: () => StudyPlan[];
+  getActiveStudyPlanId: () => string | undefined;
+  getPlannerDays: () => PlannerDay[];
+  getChapterAssignments: () => ChapterAssignment[];
+  getActivitySessions: () => ActivitySession[];
+  getActiveTimer: () => TimerState | undefined;
 }
 
 type Store = AppState & StoreActions;
@@ -192,7 +193,7 @@ const cleanupCorruptedSessions = (sessions: ActivitySession[]): ActivitySession[
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   
-  return sessions.map(session => {
+  return sessions.map((session: any) => {
     // Clean up old sessions that are still marked as active
     const sessionStart = new Date(session.startTime);
     if (sessionStart < oneDayAgo && !session.endTime) {
@@ -257,20 +258,6 @@ export const useStore = create<Store>()(
       userData: initialUserData,
       currentDate: new Date().toISOString().split('T')[0],
       
-      // Computed properties
-      exams: [],
-      examGroups: [],
-      offDays: [],
-      chapters: [],
-      dailyLogs: [],
-      settings: initialSettings,
-      studyPlans: [],
-      activeStudyPlanId: undefined,
-      plannerDays: [],
-      chapterAssignments: [],
-      activitySessions: [],
-      activeTimer: undefined,
-      
       // User actions
       addUser: (name, avatar, grade) => {
         const userId = name.toLowerCase().replace(/\s+/g, '');
@@ -313,44 +300,53 @@ export const useStore = create<Store>()(
         const state = get();
         const user = state.users.find(u => u.id === userId);
         if (!user) return;
-        
-        const userData = state.userData[userId] || {
-          exams: [],
-          examGroups: [],
-          offDays: [],
-          chapters: [],
-          dailyLogs: [],
-          settings: initialSettings,
-          studyPlans: [],
-          activeStudyPlanId: undefined,
-          plannerDays: [],
-          chapterAssignments: [],
-          activitySessions: [],
-          activeTimer: undefined,
-        };
-        
+
+        // Initialize user data if it doesn't exist
+        if (!state.userData[userId]) {
+          set((state) => ({
+            userData: {
+              ...state.userData,
+              [userId]: {
+                exams: [],
+                examGroups: [],
+                offDays: [],
+                chapters: [],
+                dailyLogs: [],
+                settings: initialSettings,
+                studyPlans: [],
+                activeStudyPlanId: undefined,
+                plannerDays: [],
+                chapterAssignments: [],
+                activitySessions: [],
+                activeTimer: undefined,
+              }
+            }
+          }));
+        }
+
         // Clean up corrupted sessions before switching
+        const userData = get().userData[userId];
         const cleanedSessions = cleanupCorruptedSessions(userData.activitySessions || []);
-        
-        set({
-          currentUserId: userId,
-          exams: userData.exams,
-          examGroups: userData.examGroups,
-          offDays: userData.offDays,
-          chapters: userData.chapters,
-          dailyLogs: userData.dailyLogs,
-          settings: userData.settings,
-          studyPlans: userData.studyPlans,
-          activeStudyPlanId: userData.activeStudyPlanId,
-          plannerDays: userData.plannerDays || [],
-          chapterAssignments: userData.chapterAssignments || [],
-          activitySessions: cleanedSessions,
-          activeTimer: userData.activeTimer,
-        });
-        
+
+        // Update sessions in userData if they were cleaned
+        if (cleanedSessions.length !== userData.activitySessions?.length) {
+          set((state) => ({
+            userData: {
+              ...state.userData,
+              [userId]: {
+                ...state.userData[userId],
+                activitySessions: cleanedSessions,
+              }
+            }
+          }));
+        }
+
+        // Only set currentUserId - data is accessed via getters
+        set({ currentUserId: userId });
+
         // Update last active
         get().updateUserProfile(userId, { lastActive: new Date().toISOString() });
-        
+
         // Ensure default plan exists and migrate orphaned assignments
         setTimeout(() => {
           get().ensureDefaultPlan();
@@ -371,14 +367,8 @@ export const useStore = create<Store>()(
       },
       
       logoutUser: () => {
-        set({
-          currentUserId: null,
-          exams: [],
-          offDays: [],
-          chapters: [],
-          dailyLogs: [],
-          settings: initialSettings,
-        });
+        // Only clear currentUserId - user data remains in userData
+        set({ currentUserId: null });
       },
       
       updateUserProfile: (userId, updates) =>
@@ -427,8 +417,8 @@ export const useStore = create<Store>()(
       updateExam: (id, exam) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
-          const updatedExams = state.exams.map((e) => 
+
+          const updatedExams = state.getExams().map((e: any) =>
             e.id === id ? { ...e, ...exam } : e
           );
           
@@ -439,16 +429,15 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 exams: updatedExams,
               }
-            },
-            exams: updatedExams,
+            }
           };
         }),
-        
+
       deleteExam: (id) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
-          const updatedExams = state.exams.filter((e) => e.id !== id);
+
+          const updatedExams = state.getExams().filter((e: any) => e.id !== id);
           
           return {
             userData: {
@@ -457,8 +446,7 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 exams: updatedExams,
               }
-            },
-            exams: updatedExams,
+            }
           };
         }),
       
@@ -485,19 +473,18 @@ export const useStore = create<Store>()(
           };
           
           return {
-            userData: updatedUserData,
-            examGroups: updatedUserData[state.currentUserId].examGroups,
+            userData: updatedUserData
           };
         }),
-        
+
       updateExamGroup: (id, examGroup) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
-          const updatedExamGroups = (state.examGroups || []).map((eg) => 
-            eg.id === id 
-              ? { 
-                  ...eg, 
+
+          const updatedExamGroups = (state.getExamGroups() || []).map((eg: any) =>
+            eg.id === id
+              ? {
+                  ...eg,
                   ...examGroup,
                   lastModified: new Date().toISOString(),
                   version: examGroup.version || (eg.version || 0) + 1
@@ -512,16 +499,15 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 examGroups: updatedExamGroups,
               }
-            },
-            examGroups: updatedExamGroups,
+            }
           };
         }),
-        
+
       deleteExamGroup: (id) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
-          const updatedExamGroups = (state.examGroups || []).filter((eg) => eg.id !== id);
+
+          const updatedExamGroups = (state.getExamGroups() || []).filter((eg: any) => eg.id !== id);
           
           return {
             userData: {
@@ -530,16 +516,15 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 examGroups: updatedExamGroups,
               }
-            },
-            examGroups: updatedExamGroups,
+            }
           };
         }),
-        
+
       applyExamGroup: (examGroupId) => {
         const state = get();
         if (!state.currentUserId) return;
-        
-        const examGroup = state.examGroups?.find(eg => eg.id === examGroupId);
+
+        const examGroup = state.getExamGroups()?.find((eg: any) => eg.id === examGroupId);
         if (!examGroup) return;
         
         // Create individual exams from the exam group
@@ -595,8 +580,8 @@ export const useStore = create<Store>()(
       deleteOffDay: (id) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
-          const updatedOffDays = state.offDays.filter((d) => d.id !== id);
+
+          const updatedOffDays = state.getOffDays().filter((d: any) => d.id !== id);
           
           return {
             userData: {
@@ -605,8 +590,7 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 offDays: updatedOffDays,
               }
-            },
-            offDays: updatedOffDays,
+            }
           };
         }),
       
@@ -649,8 +633,8 @@ export const useStore = create<Store>()(
       updateChapter: (id, chapter) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
-          const updatedChapters = state.chapters.map((c) =>
+
+          const updatedChapters = state.getChapters().map((c: any) =>
             c.id === id
               ? { ...c, ...chapter, updatedAt: new Date().toISOString() }
               : c
@@ -672,14 +656,14 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedChapters = state.chapters.filter((c) => c.id !== id);
+          const updatedChapters = state.getChapters().filter((c: any) => c.id !== id);
           
           // Clean up related data
           const cleaned = cleanupChapterData(
             id,
-            state.chapterAssignments,
-            state.activitySessions,
-            state.plannerDays
+            state.getChapterAssignments(),
+            state.getActivitySessions(),
+            state.getPlannerDays()
           );
           
           return {
@@ -704,7 +688,7 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedChapters = state.chapters.map((c) => {
+          const updatedChapters = state.getChapters().map((c: any) => {
             if (c.id === id) {
               const newStudyProgress = Math.min((c.studyProgress || 0) + hours, c.estimatedHours);
               const status = (newStudyProgress === 0 
@@ -771,13 +755,13 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedLogs = state.dailyLogs.map((log) => {
+          const updatedLogs = state.getDailyLogs().map((log: any) => {
             if (log.id === logId) {
-              const updatedTasks = log.tasks.map((task) =>
+              const updatedTasks = log.tasks.map((task: any) =>
                 task.id === taskId ? { ...task, ...updates } : task
               );
               const totalActualMinutes = updatedTasks.reduce(
-                (acc, task) => acc + (task.actualMinutes || 0),
+                (acc: any, task: any) => acc + (task.actualMinutes || 0),
                 0
               );
               return { ...log, tasks: updatedTasks, totalActualMinutes };
@@ -825,7 +809,7 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedPlannerDays = (state.plannerDays || []).map((day) =>
+          const updatedPlannerDays = (state.getPlannerDays() || []).map((day: any) =>
             day.id === id ? { ...day, ...updates } : day
           );
           
@@ -845,7 +829,7 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedPlannerDays = (state.plannerDays || []).filter((day) => day.id !== id);
+          const updatedPlannerDays = (state.getPlannerDays() || []).filter((day: any) => day.id !== id);
           
           return {
             userData: {
@@ -863,7 +847,7 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedPlannerDays = (state.plannerDays || []).map((day) => {
+          const updatedPlannerDays = (state.getPlannerDays() || []).map((day: any) => {
             if (day.id === dayId) {
               return {
                 ...day,
@@ -889,11 +873,11 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedPlannerDays = (state.plannerDays || []).map((day) => {
+          const updatedPlannerDays = (state.getPlannerDays() || []).map((day: any) => {
             if (day.id === dayId) {
               return {
                 ...day,
-                plannedTasks: day.plannedTasks.filter((task) => task.id !== taskId),
+                plannedTasks: day.plannedTasks.filter((task: any) => task.id !== taskId),
               };
             }
             return day;
@@ -915,11 +899,11 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedPlannerDays = (state.plannerDays || []).map((day) => {
+          const updatedPlannerDays = (state.getPlannerDays() || []).map((day: any) => {
             if (day.id === dayId) {
               return {
                 ...day,
-                plannedTasks: day.plannedTasks.map((task) =>
+                plannedTasks: day.plannedTasks.map((task: any) =>
                   task.id === taskId ? { ...task, ...updates } : task
                 ),
               };
@@ -942,7 +926,7 @@ export const useStore = create<Store>()(
       getPlannerDayByDate: (date) => {
         const state = get();
         if (!state.currentUserId) return undefined;
-        return state.plannerDays?.find((day) => day.date === date);
+        return state.getPlannerDays()?.find((day: any) => day.date === date);
       },
       
       // Study Plan actions
@@ -975,7 +959,7 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedPlans = (state.studyPlans || []).map((p) =>
+          const updatedPlans = (state.getStudyPlans() || []).map((p: any) =>
             p.id === id ? { ...p, ...plan, updatedAt: new Date().toISOString() } : p
           );
           
@@ -995,19 +979,19 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedPlans = (state.studyPlans || []).filter((p) => p.id !== id);
+          const updatedPlans = (state.getStudyPlans() || []).filter((p: any) => p.id !== id);
           
           // Clean up related data when deleting a plan
           const cleaned = cleanupStudyPlanData(
             id,
-            state.chapterAssignments,
-            state.activitySessions,
-            state.plannerDays
+            state.getChapterAssignments(),
+            state.getActivitySessions(),
+            state.getPlannerDays()
           );
           
           // Reset all chapter progress if this was the active plan
-          const resetChapters = state.activeStudyPlanId === id 
-            ? state.chapters.map(c => ({
+          const resetChapters = state.getActiveStudyPlanId() === id
+            ? state.getChapters().map((c: any) => ({
                 ...c,
                 studyStatus: 'not-done' as const,
                 revisionStatus: 'not-done' as const,
@@ -1016,7 +1000,7 @@ export const useStore = create<Store>()(
                 actualStudyHours: 0,
                 actualRevisionHours: 0,
               }))
-            : state.chapters;
+            : state.getChapters();
           
           return {
             userData: {
@@ -1024,7 +1008,7 @@ export const useStore = create<Store>()(
               [state.currentUserId]: {
                 ...state.userData[state.currentUserId],
                 studyPlans: updatedPlans,
-                activeStudyPlanId: state.activeStudyPlanId === id ? undefined : state.activeStudyPlanId,
+                activeStudyPlanId: state.getActiveStudyPlanId() === id ? undefined : state.getActiveStudyPlanId(),
                 chapters: resetChapters,
                 chapterAssignments: cleaned.assignments,
                 activitySessions: cleaned.sessions,
@@ -1032,7 +1016,7 @@ export const useStore = create<Store>()(
               }
             },
             studyPlans: updatedPlans,
-            activeStudyPlanId: state.activeStudyPlanId === id ? undefined : state.activeStudyPlanId,
+            activeStudyPlanId: state.getActiveStudyPlanId() === id ? undefined : state.getActiveStudyPlanId(),
             chapters: resetChapters,
             chapterAssignments: cleaned.assignments,
             activitySessions: cleaned.sessions,
@@ -1060,7 +1044,7 @@ export const useStore = create<Store>()(
         const state = get();
         if (!state.currentUserId) return;
         
-        const planToDuplicate = state.studyPlans?.find(p => p.id === id);
+        const planToDuplicate = state.getStudyPlans()?.find(p => p.id === id);
         if (!planToDuplicate) return;
         
         const duplicatedPlan = {
@@ -1081,7 +1065,7 @@ export const useStore = create<Store>()(
         const state = get();
         if (!state.currentUserId) return;
         
-        const plans = state.studyPlans || [];
+        const plans = state.getStudyPlans() || [];
         const hasDefaultPlan = plans.some(p => p.isDefault);
         
         if (!hasDefaultPlan) {
@@ -1105,9 +1089,9 @@ export const useStore = create<Store>()(
           get().addStudyPlan(defaultPlan);
           
           // Set as active if no active plan exists
-          if (!state.activeStudyPlanId) {
-            const newPlans = get().studyPlans || [];
-            const createdPlan = newPlans.find(p => p.isDefault);
+          if (!state.getActiveStudyPlanId()) {
+            const newPlans = get().getStudyPlans() || [];
+            const createdPlan = newPlans.find((p: any) => p.isDefault);
             if (createdPlan) {
               get().setActiveStudyPlan(createdPlan.id);
             }
@@ -1125,21 +1109,21 @@ export const useStore = create<Store>()(
         get().ensureDefaultPlan();
         
         // Get active plan
-        let activePlan = state.studyPlans?.find(p => p.id === state.activeStudyPlanId);
+        let activePlan = state.getStudyPlans()?.find((p: any) => p.id === state.getActiveStudyPlanId());
         
         // If no active plan, use default plan
         if (!activePlan) {
-          activePlan = state.studyPlans?.find(p => p.isDefault);
+          activePlan = state.getStudyPlans()?.find((p: any) => p.isDefault);
           if (activePlan) {
             get().setActiveStudyPlan(activePlan.id);
           }
         }
-        
+
         // If still no plan (shouldn't happen), create one
         if (!activePlan) {
           get().ensureDefaultPlan();
           const updatedState = get();
-          activePlan = updatedState.studyPlans?.find(p => p.isDefault);
+          activePlan = updatedState.getStudyPlans()?.find((p: any) => p.isDefault);
         }
         
         if (!activePlan) {
@@ -1153,22 +1137,22 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const plan = state.studyPlans?.find(p => p.id === planId);
+          const plan = state.getStudyPlans()?.find(p => p.id === planId);
           if (!plan) return state;
           
           // Get assignments for this plan
           const planAssignments = get().getAssignmentsForPlan(planId);
-          const completedAssignments = planAssignments.filter(a => a.status === 'completed');
-          const incompleteAssignments = planAssignments.filter(a => a.status !== 'completed');
+          const completedAssignments = planAssignments.filter((a: any) => a.status === 'completed');
+          const incompleteAssignments = planAssignments.filter((a: any) => a.status !== 'completed');
           
           // Handle incomplete assignments
-          let updatedAssignments = [...state.chapterAssignments];
+          let updatedAssignments = [...state.getChapterAssignments()];
           if (options.moveIncompleteTo && incompleteAssignments.length > 0) {
             const targetPlanId = options.moveIncompleteTo;
             incompleteAssignments.forEach(assignment => {
               get().linkAssignmentToPlan(assignment.id, targetPlanId);
             });
-            updatedAssignments = get().chapterAssignments;
+            updatedAssignments = get().getChapterAssignments();
           } else if (options.cancelIncomplete) {
             updatedAssignments = updatedAssignments.filter(
               a => !incompleteAssignments.some(inc => inc.id === a.id)
@@ -1182,10 +1166,10 @@ export const useStore = create<Store>()(
             completedAssignments: completedAssignments.length,
             cancelledAssignments: options.cancelIncomplete ? incompleteAssignments.length : 0,
             actualStudyHours: completedAssignments
-              .filter(a => a.activityType === 'study')
+              .filter((a: any) => a.activityType === 'study')
               .reduce((sum, a) => sum + (a.actualMinutes || a.plannedMinutes) / 60, 0),
             actualRevisionHours: completedAssignments
-              .filter(a => a.activityType === 'revision')
+              .filter((a: any) => a.activityType === 'revision')
               .reduce((sum, a) => sum + (a.actualMinutes || a.plannedMinutes) / 60, 0),
             efficiency: planAssignments.length > 0 
               ? (completedAssignments.length / planAssignments.length) * 100 
@@ -1203,7 +1187,7 @@ export const useStore = create<Store>()(
           }
           
           // Update plan status
-          const updatedPlans = (state.studyPlans || []).map(p => {
+          const updatedPlans = (state.getStudyPlans() || []).map(p => {
             if (p.id === planId) {
               return {
                 ...p,
@@ -1233,13 +1217,13 @@ export const useStore = create<Store>()(
         const state = get();
         if (!state.currentUserId) return false;
         
-        const plan = state.studyPlans?.find(p => p.id === planId);
+        const plan = state.getStudyPlans()?.find(p => p.id === planId);
         if (!plan) return false;
         
         const assignments = get().getAssignmentsForPlan(planId);
         if (assignments.length === 0) return false;
         
-        const completedCount = assignments.filter(a => a.status === 'completed').length;
+        const completedCount = assignments.filter((a: any) => a.status === 'completed').length;
         const completionRate = (completedCount / assignments.length) * 100;
         
         // Check completion criteria
@@ -1267,11 +1251,11 @@ export const useStore = create<Store>()(
         const state = get();
         if (!state.currentUserId) return;
         
-        const plan = state.studyPlans?.find(p => p.id === planId);
+        const plan = state.getStudyPlans()?.find(p => p.id === planId);
         if (!plan || !plan.completionCriteria?.autoComplete) return;
         
         const assignments = get().getAssignmentsForPlan(planId);
-        const completedCount = assignments.filter(a => a.status === 'completed').length;
+        const completedCount = assignments.filter((a: any) => a.status === 'completed').length;
         const completionRate = (completedCount / assignments.length) * 100;
         
         // Check if meets auto-completion threshold
@@ -1300,7 +1284,7 @@ export const useStore = create<Store>()(
             assignmentPlanId = activePlan.id;
             planName = activePlan.name;
           } else {
-            const plan = state.studyPlans?.find(p => p.id === assignmentPlanId);
+            const plan = state.getStudyPlans()?.find(p => p.id === assignmentPlanId);
             planName = plan?.name;
           }
           
@@ -1316,10 +1300,10 @@ export const useStore = create<Store>()(
             planName,
           };
           
-          const updatedAssignments = [...(state.chapterAssignments || []), assignment];
+          const updatedAssignments = [...(state.getChapterAssignments() || []), assignment];
           
           // Update plan's assignmentIds if it exists
-          const updatedPlans = (state.studyPlans || []).map(plan => {
+          const updatedPlans = (state.getStudyPlans() || []).map(plan => {
             if (plan.id === assignmentPlanId) {
               return {
                 ...plan,
@@ -1348,7 +1332,7 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedAssignments = (state.chapterAssignments || []).map((assignment) =>
+          const updatedAssignments = (state.getChapterAssignments() || []).map((assignment) =>
             assignment.id === id ? { ...assignment, ...updates } : assignment
           );
           
@@ -1369,16 +1353,16 @@ export const useStore = create<Store>()(
           if (!state.currentUserId) return state;
           
           // Check if this assignment has an active timer/session
-          const activeSession = state.activitySessions?.find(
+          const activeSession = state.getActivitySessions()?.find(
             s => s.assignmentId === id && s.isActive
           );
           
-          const updatedAssignments = (state.chapterAssignments || []).filter(
+          const updatedAssignments = (state.getChapterAssignments() || []).filter(
             (assignment) => assignment.id !== id
           );
           
           // Clean up any active sessions for this assignment
-          const updatedSessions = state.activitySessions?.filter(
+          const updatedSessions = state.getActivitySessions()?.filter(
             s => s.assignmentId !== id
           ) || [];
           
@@ -1397,14 +1381,14 @@ export const useStore = create<Store>()(
             },
             chapterAssignments: updatedAssignments,
             activitySessions: updatedSessions,
-            activeTimer: shouldStopTimer ? undefined : state.activeTimer
+            activeTimer: shouldStopTimer ? undefined : state.getActiveTimer()
           };
         }),
         
       getAssignmentsForDate: (date) => {
         const state = get();
         if (!state.currentUserId) return [];
-        return (state.chapterAssignments || []).filter(
+        return (state.getChapterAssignments() || []).filter(
           (assignment) => assignment.date === date
         );
       },
@@ -1412,7 +1396,7 @@ export const useStore = create<Store>()(
       getAssignmentsForChapter: (chapterId) => {
         const state = get();
         if (!state.currentUserId) return [];
-        return (state.chapterAssignments || []).filter(
+        return (state.getChapterAssignments() || []).filter(
           (assignment) => assignment.chapterId === chapterId
         );
       },
@@ -1420,7 +1404,7 @@ export const useStore = create<Store>()(
       getAssignmentsForPlan: (planId) => {
         const state = get();
         if (!state.currentUserId) return [];
-        return (state.chapterAssignments || []).filter(
+        return (state.getChapterAssignments() || []).filter(
           (assignment) => assignment.planId === planId
         );
       },
@@ -1429,10 +1413,10 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const plan = state.studyPlans?.find(p => p.id === planId);
+          const plan = state.getStudyPlans()?.find(p => p.id === planId);
           if (!plan) return state;
           
-          const updatedAssignments = (state.chapterAssignments || []).map(assignment => {
+          const updatedAssignments = (state.getChapterAssignments() || []).map((assignment: any) => {
             if (assignment.id === assignmentId) {
               return {
                 ...assignment,
@@ -1445,7 +1429,7 @@ export const useStore = create<Store>()(
           });
           
           // Update plan's assignmentIds
-          const updatedPlans = (state.studyPlans || []).map(p => {
+          const updatedPlans = (state.getStudyPlans() || []).map(p => {
             if (p.id === planId) {
               const newAssignmentIds = [...(p.assignmentIds || [])];
               if (!newAssignmentIds.includes(assignmentId)) {
@@ -1489,7 +1473,7 @@ export const useStore = create<Store>()(
           if (!state.currentUserId) return state;
           
           // Find the assignment
-          const assignment = state.chapterAssignments.find(a => a.id === assignmentId);
+          const assignment = state.getChapterAssignments().find((a: any) => a.id === assignmentId);
           if (!assignment) return state;
           
           // Create new activity session
@@ -1505,13 +1489,23 @@ export const useStore = create<Store>()(
           };
           
           // Update assignment status to in-progress
-          const updatedAssignments = state.chapterAssignments.map(a =>
+          const updatedAssignments = state.getChapterAssignments().map(a =>
             a.id === assignmentId ? { ...a, status: 'in-progress' as const, startTime: newSession.startTime } : a
           );
           
           // Add session to activity sessions
-          const updatedSessions = [...(state.activitySessions || []), newSession];
-          
+          const updatedSessions = [...(state.getActivitySessions() || []), newSession];
+
+          // Create new timer state
+          const newTimer: TimerState = {
+            sessionId: newSession.sessionId,
+            assignmentId,
+            startTime: new Date(newSession.startTime).getTime(),
+            totalPausedMs: 0,
+            isActive: true,
+            plannedMinutes: assignment.plannedMinutes
+          };
+
           return {
             userData: {
               ...state.userData,
@@ -1519,28 +1513,12 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 chapterAssignments: updatedAssignments,
                 activitySessions: updatedSessions,
-                activeTimer: {
-                  isRunning: true,
-                  isPaused: false,
-                  elapsedTime: 0,
-                  plannedTime: assignment.plannedMinutes * 60,
-                  overtimeAllowed: true,
-                  warningShown: false,
-                  completionAlertShown: false
-                }
+                activeTimer: newTimer
               }
             },
             chapterAssignments: updatedAssignments,
             activitySessions: updatedSessions,
-            activeTimer: {
-              isRunning: true,
-              isPaused: false,
-              elapsedTime: 0,
-              plannedTime: assignment.plannedMinutes * 60,
-              overtimeAllowed: true,
-              warningShown: false,
-              completionAlertShown: false
-            }
+            activeTimer: newTimer
           };
         }),
       
@@ -1549,7 +1527,7 @@ export const useStore = create<Store>()(
           // pauseActivity called
           if (!state.currentUserId) return state;
           
-          const session = state.activitySessions?.find(s => s.sessionId === sessionId);
+          const session = state.getActivitySessions()?.find(s => s.sessionId === sessionId);
           // Found session to pause
           
           // Fixed: Allow pausing even if state shows not active (to fix corrupted state)
@@ -1564,7 +1542,7 @@ export const useStore = create<Store>()(
             // Session is already paused
             // Fix the isActive flag if it's wrong
             if (session.isActive) {
-              const fixedSessions = state.activitySessions.map(s =>
+              const fixedSessions = state.getActivitySessions().map(s =>
                 s.sessionId === sessionId ? { ...s, isActive: false } : s
               );
               return {
@@ -1585,7 +1563,7 @@ export const useStore = create<Store>()(
           const pausedAt = new Date().toISOString();
           
           // Update session with paused interval and ensure isActive is false
-          const updatedSessions = state.activitySessions.map(s =>
+          const updatedSessions = state.getActivitySessions().map(s =>
             s.sessionId === sessionId
               ? {
                   ...s,
@@ -1598,10 +1576,18 @@ export const useStore = create<Store>()(
           // Session paused successfully
           
           // Update assignment status to paused
-          const updatedAssignments = state.chapterAssignments.map(a =>
+          const updatedAssignments = state.getChapterAssignments().map(a =>
             a.id === session.assignmentId ? { ...a, status: 'paused' as const, pausedAt } : a
           );
           
+          // Update timer state for pause
+          const updatedTimer = state.getActiveTimer();
+          const pausedTimer = updatedTimer ? {
+            ...updatedTimer,
+            currentPauseStart: new Date(pausedAt).getTime(),
+            isActive: false
+          } : undefined;
+
           return {
             userData: {
               ...state.userData,
@@ -1609,12 +1595,12 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 chapterAssignments: updatedAssignments,
                 activitySessions: updatedSessions,
-                activeTimer: state.activeTimer ? { ...state.activeTimer, isPaused: true, isRunning: false } : undefined
+                activeTimer: pausedTimer
               }
             },
             chapterAssignments: updatedAssignments,
             activitySessions: updatedSessions,
-            activeTimer: state.activeTimer ? { ...state.activeTimer, isPaused: true, isRunning: false } : undefined
+            activeTimer: pausedTimer
           };
         }),
       
@@ -1626,7 +1612,7 @@ export const useStore = create<Store>()(
             return state;
           }
           
-          const session = state.activitySessions?.find(s => s.sessionId === sessionId);
+          const session = state.getActivitySessions()?.find(s => s.sessionId === sessionId);
           // Found session to resume
           if (!session) {
             // Session not found
@@ -1643,7 +1629,7 @@ export const useStore = create<Store>()(
           const resumedAt = new Date().toISOString();
           
           // Update the last paused interval with resume time
-          const updatedSessions = state.activitySessions.map(s => {
+          const updatedSessions = state.getActivitySessions().map((s: any) => {
             if (s.sessionId === sessionId) {
               const intervals = [...s.pausedIntervals];
               // Only update if there's an unresumed pause interval
@@ -1661,12 +1647,22 @@ export const useStore = create<Store>()(
           });
           
           // Update assignment status back to in-progress
-          const updatedAssignments = state.chapterAssignments.map(a =>
+          const updatedAssignments = state.getChapterAssignments().map(a =>
             a.id === session.assignmentId ? { ...a, status: 'in-progress' as const, pausedAt: undefined } : a
           );
           
-          // Resume successful
-          
+          // Update timer state for resume
+          const currentTimer = state.getActiveTimer();
+          const resumedTimer = currentTimer && currentTimer.currentPauseStart ? {
+            ...currentTimer,
+            totalPausedMs: currentTimer.totalPausedMs + (new Date(resumedAt).getTime() - currentTimer.currentPauseStart),
+            currentPauseStart: undefined,
+            isActive: true
+          } : currentTimer ? {
+            ...currentTimer,
+            isActive: true
+          } : undefined;
+
           return {
             userData: {
               ...state.userData,
@@ -1674,12 +1670,12 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 chapterAssignments: updatedAssignments,
                 activitySessions: updatedSessions,
-                activeTimer: state.activeTimer ? { ...state.activeTimer, isPaused: false, isRunning: true } : undefined
+                activeTimer: resumedTimer
               }
             },
             chapterAssignments: updatedAssignments,
             activitySessions: updatedSessions,
-            activeTimer: state.activeTimer ? { ...state.activeTimer, isPaused: false, isRunning: true } : undefined
+            activeTimer: resumedTimer
           };
         }),
       
@@ -1687,20 +1683,20 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const session = state.activitySessions?.find(s => s.sessionId === sessionId);
+          const session = state.getActivitySessions()?.find(s => s.sessionId === sessionId);
           if (!session) return state;
           
           const endTime = new Date().toISOString();
           
           // Update session with end time and duration
-          const updatedSessions = state.activitySessions.map(s =>
+          const updatedSessions = state.getActivitySessions().map(s =>
             s.sessionId === sessionId
               ? { ...s, endTime, duration: actualMinutes, isActive: false }
               : s
           );
           
           // Update assignment status to completed and record actual time
-          const updatedAssignments = state.chapterAssignments.map(a =>
+          const updatedAssignments = state.getChapterAssignments().map(a =>
             a.id === session.assignmentId 
               ? { 
                   ...a, 
@@ -1713,10 +1709,10 @@ export const useStore = create<Store>()(
           );
           
           // Update chapter progress
-          const assignment = state.chapterAssignments.find(a => a.id === session.assignmentId);
-          let updatedChapters = state.chapters;
+          const assignment = state.getChapterAssignments().find((a: any) => a.id === session.assignmentId);
+          let updatedChapters = state.getChapters();
           if (assignment) {
-            updatedChapters = state.chapters.map(c => {
+            updatedChapters = state.getChapters().map((c: any) => {
               if (c.id === assignment.chapterId) {
                 if (assignment.activityType === 'study') {
                   return {
@@ -1763,10 +1759,10 @@ export const useStore = create<Store>()(
         if (!state.currentUserId) return undefined;
         
         // Find the current session (active or paused, but not completed)
-        const sessions = state.activitySessions || [];
+        const sessions = state.getActivitySessions() || [];
         
         // First try to find an active session
-        const activeSession = sessions.find(s => s.isActive);
+        const activeSession = sessions.find((s: any) => s.isActive);
         if (activeSession) {
           // Check if this session is corrupted (has all paused intervals resumed but still shows as active)
           const allIntervalsResumed = activeSession.pausedIntervals.length > 0 && 
@@ -1780,7 +1776,7 @@ export const useStore = create<Store>()(
         }
         
         // If no active session, find a paused session (has no endTime and is not active)
-        const pausedSession = sessions.find(s => !s.endTime && !s.isActive);
+        const pausedSession = sessions.find((s: any) => !s.endTime && !s.isActive);
         if (pausedSession) {
           // Check if this is actually paused (has an unresumed pause interval)
           const hasUnresumedPause = pausedSession.pausedIntervals.some(interval => !interval.resumedAt);
@@ -1797,8 +1793,8 @@ export const useStore = create<Store>()(
       updateTimerState: (updates) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
-          const updatedTimer = state.activeTimer ? { ...state.activeTimer, ...updates } : undefined;
+
+          const updatedTimer = state.getActiveTimer() ? { ...state.getActiveTimer()!, ...updates } as any : undefined;
           
           return {
             userData: {
@@ -1833,7 +1829,7 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
           
-          const updatedSettings = { ...state.settings, ...settings };
+          const updatedSettings = { ...state.getSettings(), ...settings };
           
           return {
             userData: {
@@ -1988,7 +1984,7 @@ export const useStore = create<Store>()(
           // Manual cleanup triggered - also resets any orphaned timers
           if (!state.currentUserId) return state;
           
-          const cleanedSessions = cleanupCorruptedSessions(state.activitySessions || []);
+          const cleanedSessions = cleanupCorruptedSessions(state.getActivitySessions() || []);
           
           // Check if we have any active sessions left
           const hasActiveSessions = cleanedSessions.some(s => s.isActive);
@@ -2004,7 +2000,7 @@ export const useStore = create<Store>()(
               }
             },
             activitySessions: cleanedSessions,
-            activeTimer: hasActiveSessions ? state.activeTimer : undefined
+            activeTimer: hasActiveSessions ? state.getActiveTimer() : undefined
           };
         }),
       
@@ -2044,7 +2040,7 @@ export const useStore = create<Store>()(
             plannerDays: data.plannerDays || [],
             chapterAssignments: data.chapterAssignments || [],
             activitySessions: data.activitySessions || [],
-            settings: data.settings || state.settings,
+            settings: data.settings || state.getSettings(),
           };
           
           // Add IDs if missing and validate dates
@@ -2095,18 +2091,7 @@ export const useStore = create<Store>()(
             userData: {
               ...state.userData,
               [state.currentUserId]: importedData
-            },
-            chapters: importedData.chapters,
-            exams: importedData.exams,
-            examGroups: importedData.examGroups,
-            offDays: importedData.offDays,
-            dailyLogs: importedData.dailyLogs,
-            studyPlans: importedData.studyPlans,
-            activeStudyPlanId: importedData.activeStudyPlanId,
-            plannerDays: importedData.plannerDays,
-            chapterAssignments: importedData.chapterAssignments,
-            activitySessions: importedData.activitySessions,
-            settings: importedData.settings,
+            }
           });
           
           return true;
@@ -2122,21 +2107,21 @@ export const useStore = create<Store>()(
           if (!state.currentUserId) return state;
           
           // Get valid IDs
-          const validChapterIds = state.chapters.map(c => c.id);
-          const validAssignmentIds = state.chapterAssignments.map(a => a.id);
+          const validChapterIds = state.getChapters().map((c: any) => c.id);
+          const validAssignmentIds = state.getChapterAssignments().map((a: any) => a.id);
           
           // Clean up orphaned assignments
-          const cleanedAssignments = state.chapterAssignments.filter(a => 
+          const cleanedAssignments = state.getChapterAssignments().filter((a: any) => 
             validChapterIds.includes(a.chapterId)
           );
           
           // Clean up orphaned sessions
-          const cleanedSessions = state.activitySessions.filter(s =>
+          const cleanedSessions = state.getActivitySessions().filter(s =>
             cleanedAssignments.some(a => a.id === s.assignmentId)
           );
           
           // Clean up orphaned tasks in planner days
-          const cleanedPlannerDays = state.plannerDays.map(day => ({
+          const cleanedPlannerDays = state.getPlannerDays().map(day => ({
             ...day,
             plannedTasks: day.plannedTasks.filter(task => 
               validChapterIds.includes(task.chapterId)
@@ -2168,7 +2153,7 @@ export const useStore = create<Store>()(
         get().ensureDefaultPlan();
         
         // Find orphaned assignments (those without planId)
-        const orphanedAssignments = (state.chapterAssignments || []).filter(a => !a.planId);
+        const orphanedAssignments = (state.getChapterAssignments() || []).filter((a: any) => !a.planId);
         
         if (orphanedAssignments.length === 0) {
           console.log('No orphaned assignments to migrate');
@@ -2176,11 +2161,11 @@ export const useStore = create<Store>()(
         }
         
         // Find or create migration plan
-        let migrationPlan = state.studyPlans?.find(p => p.name === 'Migrated Activities');
+        let migrationPlan = state.getStudyPlans()?.find(p => p.name === 'Migrated Activities');
         
         if (!migrationPlan) {
           // Calculate date range for migrated activities
-          const dates = orphanedAssignments.map(a => new Date(a.date).getTime());
+          const dates = orphanedAssignments.map((a: any) => new Date(a.date).getTime());
           const minDate = new Date(Math.min(...dates));
           const maxDate = new Date(Math.max(...dates));
           
@@ -2196,7 +2181,7 @@ export const useStore = create<Store>()(
             completedStudyHours: 0,
             completedRevisionHours: 0,
             status: 'active',
-            assignmentIds: orphanedAssignments.map(a => a.id),
+            assignmentIds: orphanedAssignments.map((a: any) => a.id),
             notes: 'Auto-created plan for previously scheduled activities',
           };
           
@@ -2204,7 +2189,7 @@ export const useStore = create<Store>()(
           
           // Get the created plan
           const updatedState = get();
-          migrationPlan = updatedState.studyPlans?.find(p => p.name === 'Migrated Activities');
+          migrationPlan = updatedState.getStudyPlans()?.find((p: any) => p.name === 'Migrated Activities');
         }
         
         if (migrationPlan) {
@@ -2227,7 +2212,7 @@ export const useStore = create<Store>()(
           if (!state.currentUserId) return state;
           
           // End all active sessions and reset timers
-          const updatedSessions = (state.activitySessions || []).map(session => ({
+          const updatedSessions = (state.getActivitySessions() || []).map((session: any) => ({
             ...session,
             isActive: false,
             endTime: session.isActive && !session.endTime ? new Date().toISOString() : session.endTime
@@ -2252,12 +2237,12 @@ export const useStore = create<Store>()(
           if (!state.currentUserId) return state;
           
           const today = new Date().toISOString().split('T')[0];
-          const assignments = state.chapterAssignments || [];
-          const todayAssignments = assignments.filter(a => a.date === today);
-          const todayAssignmentIds = new Set(todayAssignments.map(a => a.id));
+          const assignments = state.getChapterAssignments() || [];
+          const todayAssignments = assignments.filter((a: any) => a.date === today);
+          const todayAssignmentIds = new Set(todayAssignments.map((a: any) => a.id));
           
           // Clean up sessions that don't have matching assignments for today
-          const validSessions = (state.activitySessions || []).filter(session => {
+          const validSessions = (state.getActivitySessions() || []).filter(session => {
             // Keep only sessions for today's assignments
             if (!todayAssignmentIds.has(session.assignmentId)) {
               // End the session if it was active
@@ -2270,9 +2255,9 @@ export const useStore = create<Store>()(
           
           // Check if we have any active sessions left
           const hasActiveSessions = validSessions.some(s => s.isActive);
-          
+
           // If timer is running but no active sessions, stop the timer
-          const shouldResetTimer = state.activeTimer?.isRunning && !hasActiveSessions;
+          const shouldResetTimer = state.getActiveTimer()?.isActive && !hasActiveSessions;
           
           return {
             userData: {
@@ -2282,56 +2267,141 @@ export const useStore = create<Store>()(
                 activitySessions: validSessions,
                 activeTimer: shouldResetTimer ? undefined : state.userData[state.currentUserId]?.activeTimer
               }
-            },
-            activitySessions: validSessions,
-            activeTimer: shouldResetTimer ? undefined : state.activeTimer
+            }
           };
         }),
+
+      // Computed getters for current user data
+      getExams: () => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return state.userData[state.currentUserId]?.exams || [];
+      },
+
+      getExamGroups: () => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return state.userData[state.currentUserId]?.examGroups || [];
+      },
+
+      getOffDays: () => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return state.userData[state.currentUserId]?.offDays || [];
+      },
+
+      getChapters: () => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return state.userData[state.currentUserId]?.chapters || [];
+      },
+
+      getDailyLogs: () => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return state.userData[state.currentUserId]?.dailyLogs || [];
+      },
+
+      getSettings: () => {
+        const state = get();
+        if (!state.currentUserId) return initialSettings;
+        return state.userData[state.currentUserId]?.settings || initialSettings;
+      },
+
+      getStudyPlans: () => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return state.userData[state.currentUserId]?.studyPlans || [];
+      },
+
+      getActiveStudyPlanId: () => {
+        const state = get();
+        if (!state.currentUserId) return undefined;
+        return state.userData[state.currentUserId]?.activeStudyPlanId;
+      },
+
+      getPlannerDays: () => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return state.userData[state.currentUserId]?.plannerDays || [];
+      },
+
+      getChapterAssignments: () => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return state.userData[state.currentUserId]?.chapterAssignments || [];
+      },
+
+      getActivitySessions: () => {
+        const state = get();
+        if (!state.currentUserId) return [];
+        return state.userData[state.currentUserId]?.activitySessions || [];
+      },
+
+      getActiveTimer: () => {
+        const state = get();
+        if (!state.currentUserId) return undefined;
+        return state.userData[state.currentUserId]?.activeTimer;
+      },
+
+      getElapsedTime: (assignmentId?: string) => {
+        const state = get();
+        if (!state.currentUserId) return 0;
+
+        const timer = state.getActiveTimer();
+        if (!timer) return 0;
+
+        // If assignmentId is provided, check if it matches
+        if (assignmentId && timer.assignmentId !== assignmentId) return 0;
+
+        const now = Date.now();
+        let elapsed = now - timer.startTime - timer.totalPausedMs;
+
+        // If currently paused, subtract the current pause duration
+        if (timer.currentPauseStart) {
+          elapsed -= (now - timer.currentPauseStart);
+        }
+
+        // Return elapsed time in seconds
+        return Math.max(0, Math.floor(elapsed / 1000));
+      },
       };
     },
     {
       name: 'study-planner-storage',
       onRehydrateStorage: () => (state) => {
         // Clean up corrupted sessions and validate state on app load
-        if (state) {
+        if (state && state.currentUserId && state.userData[state.currentUserId]) {
           const today = new Date().toISOString().split('T')[0];
-          
+          const userId = state.currentUserId;
+          const userData = state.userData[userId];
+
           // Clean up corrupted sessions
-          if (state.activitySessions) {
-            const cleanedSessions = cleanupCorruptedSessions(state.activitySessions);
-            
+          if (userData.activitySessions) {
+            const cleanedSessions = cleanupCorruptedSessions(userData.activitySessions);
+
             // Further validation: remove sessions for non-existent assignments
-            const assignments = state.chapterAssignments || [];
-            const assignmentIds = new Set(assignments.map(a => a.id));
-            
+            const assignments = userData.chapterAssignments || [];
+            const assignmentIds = new Set(assignments.map((a: any) => a.id));
+
             const validSessions = cleanedSessions.filter(session => {
               // Keep session only if its assignment still exists
               return assignmentIds.has(session.assignmentId);
             });
-            
+
             // Check if there are any active sessions for today's assignments
-            const todayAssignments = assignments.filter(a => a.date === today);
-            const todayAssignmentIds = new Set(todayAssignments.map(a => a.id));
+            const todayAssignments = assignments.filter((a: any) => a.date === today);
+            const todayAssignmentIds = new Set(todayAssignments.map((a: any) => a.id));
             const hasValidActiveSession = validSessions.some(
               s => s.isActive && todayAssignmentIds.has(s.assignmentId)
             );
-            
-            // Update sessions
-            state.activitySessions = validSessions;
-            
-            // Reset timer if no valid active sessions
-            if (!hasValidActiveSession && state.activeTimer?.isRunning) {
-              state.activeTimer = undefined;
+
+            // Update userData only (no top-level state)
+            state.userData[userId].activitySessions = validSessions;
+            if (!hasValidActiveSession) {
+              state.userData[userId].activeTimer = undefined;
             }
-            
-            // Update userData if current user exists
-            if (state.currentUserId && state.userData[state.currentUserId]) {
-              state.userData[state.currentUserId].activitySessions = validSessions;
-              if (!hasValidActiveSession) {
-                state.userData[state.currentUserId].activeTimer = undefined;
-              }
-            }
-            
+
             console.log('Session state validated on app load');
           }
         }

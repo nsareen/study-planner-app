@@ -15,33 +15,32 @@ const motivationalMessages = [
 ];
 
 const TodayPlan: React.FC = () => {
-  const {
-    chapters,
-    chapterAssignments,
-    activitySessions,
-    startActivity,
-    pauseActivity,
-    resumeActivity,
-    completeActivity,
-    getActiveSession
-  } = useStore();
-  
-  const [timer, setTimer] = useState<{ [key: string]: number }>({});
+  const chapters = useStore((state) => state.getChapters());
+  const chapterAssignments = useStore((state) => state.getChapterAssignments());
+  const activitySessions = useStore((state) => state.getActivitySessions());
+  const startActivity = useStore((state) => state.startActivity);
+  const pauseActivity = useStore((state) => state.pauseActivity);
+  const resumeActivity = useStore((state) => state.resumeActivity);
+  const completeActivity = useStore((state) => state.completeActivity);
+  const getActiveSession = useStore((state) => state.getActiveSession);
+  const getElapsedTime = useStore((state) => state.getElapsedTime);
+
   const [motivationalMessage, setMotivationalMessage] = useState(motivationalMessages[0]);
+  const [, forceUpdate] = useState(0); // For forcing re-renders when timer updates
   const todayStr = format(new Date(), 'yyyy-MM-dd');
-  
+
   // Get only today's scheduled assignments
-  const todaysAssignments = chapterAssignments.filter(a => a.date === todayStr);
+  const todaysAssignments = chapterAssignments.filter((a: any) => a.date === todayStr);
   const activeSession = getActiveSession();
-  
+
   // Calculate overall progress
   const totalTasks = todaysAssignments.length;
-  const completedTasks = todaysAssignments.filter(a => a.status === 'completed').length;
-  const inProgressTasks = todaysAssignments.filter(a => a.status === 'in-progress').length;
+  const completedTasks = todaysAssignments.filter((a: any) => a.status === 'completed').length;
+  const inProgressTasks = todaysAssignments.filter((a: any) => a.status === 'in-progress').length;
   const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  
-  const totalPlannedMinutes = todaysAssignments.reduce((sum, a) => sum + a.plannedMinutes, 0);
-  const totalActualMinutes = todaysAssignments.reduce((sum, a) => sum + (a.actualMinutes || 0), 0);
+
+  const totalPlannedMinutes = todaysAssignments.reduce((sum: any, a: any) => sum + a.plannedMinutes, 0);
+  const totalActualMinutes = todaysAssignments.reduce((sum: any, a: any) => sum + (a.actualMinutes || 0), 0);
   
   useEffect(() => {
     const interval = setInterval(() => {
@@ -49,57 +48,17 @@ const TodayPlan: React.FC = () => {
     }, 5000);
     return () => clearInterval(interval);
   }, []);
-  
-  // Timer effect for active sessions
+
+  // Timer update effect - forces re-render every second if there's an active session
   useEffect(() => {
-    // Clear all timers if no active session
-    if (!activeSession) {
-      setTimer({});
-      return;
-    }
-    
-    // Calculate total paused time
-    const calculateElapsedTime = () => {
-      // Calculate total time from completed pause intervals
-      const completedPausedMs = activeSession.pausedIntervals
-        .filter(interval => interval.resumedAt)
-        .reduce((total, interval) => {
-          return total + (new Date(interval.resumedAt!).getTime() - new Date(interval.pausedAt).getTime());
-        }, 0);
-      
-      let activeTime;
-      if (activeSession.isActive) {
-        // Currently running - calculate time up to now minus pauses
-        activeTime = Date.now() - new Date(activeSession.startTime).getTime() - completedPausedMs;
-      } else {
-        // Currently paused - calculate time up to when it was paused
-        const currentPause = activeSession.pausedIntervals[activeSession.pausedIntervals.length - 1];
-        if (currentPause && !currentPause.resumedAt) {
-          // Use the pause time as the end point
-          activeTime = new Date(currentPause.pausedAt).getTime() - new Date(activeSession.startTime).getTime() - completedPausedMs;
-        } else {
-          // Fallback - shouldn't happen
-          activeTime = 0;
-        }
-      }
-      
-      return Math.floor(Math.max(0, activeTime) / 1000);
-    };
-    
-    // Set initial time immediately
-    const elapsed = calculateElapsedTime();
-    setTimer(prev => ({ ...prev, [activeSession.assignmentId]: elapsed }));
-    
-    // Only update timer if running
-    if (activeSession.isActive) {
-      const interval = setInterval(() => {
-        const elapsed = calculateElapsedTime();
-        setTimer(prev => ({ ...prev, [activeSession.assignmentId]: elapsed }));
-      }, 1000);
-      
-      return () => clearInterval(interval);
-    }
-  }, [activeSession]);
+    if (!activeSession || !activeSession.isActive) return;
+
+    const interval = setInterval(() => {
+      forceUpdate(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeSession?.isActive]);
   
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -119,27 +78,22 @@ const TodayPlan: React.FC = () => {
       return;
     }
     startActivity(assignmentId);
-    setTimer(prev => ({ ...prev, [assignmentId]: 0 }));
   };
-  
+
   const handleCompleteActivity = (assignmentId: string) => {
     if (!activeSession || activeSession.assignmentId !== assignmentId) return;
-    
-    const elapsedMinutes = Math.floor((timer[assignmentId] || 0) / 60);
+
+    const elapsedSeconds = getElapsedTime(assignmentId);
+    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
     const confirmMessage = `Are you sure you want to complete this task?\n\nTime spent: ${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`;
-    
+
     if (window.confirm(confirmMessage)) {
       completeActivity(activeSession.sessionId, elapsedMinutes);
-      setTimer(prev => {
-        const newTimer = { ...prev };
-        delete newTimer[assignmentId];
-        return newTimer;
-      });
     }
   };
   
   const getChapterForAssignment = (assignment: typeof todaysAssignments[0]) => {
-    return chapters.find(c => c.id === assignment.chapterId);
+    return chapters.find((c: any) => c.id === assignment.chapterId);
   };
   
   const getPriorityLabel = (priority: number) => {
@@ -191,7 +145,7 @@ const TodayPlan: React.FC = () => {
                 <Clock className="w-5 h-5 text-blue-500 animate-spin-slow" />
               </div>
               <div className="text-2xl font-bold text-blue-800">
-                {activeSession ? formatTime(timer[activeSession.assignmentId] || 0) : '00:00'}
+                {activeSession ? formatTime(getElapsedTime(activeSession.assignmentId)) : '00:00'}
               </div>
             </div>
             
@@ -228,25 +182,25 @@ const TodayPlan: React.FC = () => {
                       <p className="text-sm opacity-90 mb-1">Currently Working On</p>
                       <h3 className="text-2xl font-bold">
                         {(() => {
-                          const assignment = todaysAssignments.find(a => a.id === activeSession.assignmentId);
+                          const assignment = todaysAssignments.find((a: any) => a.id === activeSession.assignmentId);
                           return assignment ? getChapterForAssignment(assignment)?.name : 'Activity';
                         })() || 'Activity'}
                       </h3>
                     </div>
                     <div className="text-4xl font-mono font-bold">
-                      {formatTime(timer[activeSession.assignmentId] || 0)}
+                      {formatTime(getElapsedTime(activeSession.assignmentId))}
                     </div>
                   </div>
                 </div>
               )}
               
               {/* Task Cards */}
-              {todaysAssignments.map((assignment) => {
+              {todaysAssignments.map((assignment: any) => {
                 const chapter = getChapterForAssignment(assignment);
                 const priorityInfo = getPriorityLabel(0.5); // Default medium priority
                 const isActive = activeSession?.assignmentId === assignment.id && activeSession?.isActive;
                 const isPaused = activeSession?.assignmentId === assignment.id && !activeSession?.isActive;
-                const taskTimer = timer[assignment.id] || 0;
+                const taskTimer = getElapsedTime(assignment.id);
                 
                 if (!chapter) return null;
                 

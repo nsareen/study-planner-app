@@ -13,15 +13,35 @@ import EnhancedMatrixEditor from '../components/EnhancedMatrixEditor';
 import StudyPlanManager from '../components/StudyPlanManager';
 
 const SmartPlanner: React.FC = () => {
-  const { 
-    chapters, exams, examGroups, offDays, studyPlans, activeStudyPlanId, plannerDays,
-    chapterAssignments, activitySessions,
-    addExam, addChapter, updateChapter, deleteChapter, 
-    addStudyPlan, updateStudyPlan, deleteStudyPlan, setActiveStudyPlan, duplicateStudyPlan,
-    addPlannerDay, getPlannerDayByDate,
-    scheduleChapter, getAssignmentsForDate, deleteAssignment, updateAssignment,
-    startActivity, pauseActivity, resumeActivity, completeActivity, getActiveSession
-  } = useStore();
+  const chapters = useStore((state) => state.getChapters());
+  const exams = useStore((state) => state.getExams());
+  const examGroups = useStore((state) => state.getExamGroups());
+  const offDays = useStore((state) => state.getOffDays());
+  const studyPlans = useStore((state) => state.getStudyPlans());
+  const activeStudyPlanId = useStore((state) => state.getActiveStudyPlanId());
+  const plannerDays = useStore((state) => state.getPlannerDays());
+  const chapterAssignments = useStore((state) => state.getChapterAssignments());
+  const activitySessions = useStore((state) => state.getActivitySessions());
+  const addExam = useStore((state) => state.addExam);
+  const addChapter = useStore((state) => state.addChapter);
+  const updateChapter = useStore((state) => state.updateChapter);
+  const deleteChapter = useStore((state) => state.deleteChapter);
+  const addStudyPlan = useStore((state) => state.addStudyPlan);
+  const updateStudyPlan = useStore((state) => state.updateStudyPlan);
+  const deleteStudyPlan = useStore((state) => state.deleteStudyPlan);
+  const setActiveStudyPlan = useStore((state) => state.setActiveStudyPlan);
+  const duplicateStudyPlan = useStore((state) => state.duplicateStudyPlan);
+  const addPlannerDay = useStore((state) => state.addPlannerDay);
+  const getPlannerDayByDate = useStore((state) => state.getPlannerDayByDate);
+  const scheduleChapter = useStore((state) => state.scheduleChapter);
+  const getAssignmentsForDate = useStore((state) => state.getAssignmentsForDate);
+  const deleteAssignment = useStore((state) => state.deleteAssignment);
+  const updateAssignment = useStore((state) => state.updateAssignment);
+  const startActivity = useStore((state) => state.startActivity);
+  const pauseActivity = useStore((state) => state.pauseActivity);
+  const resumeActivity = useStore((state) => state.resumeActivity);
+  const completeActivity = useStore((state) => state.completeActivity);
+  const getActiveSession = useStore((state) => state.getActiveSession);
   
   // Simplified to 3 essential tabs
   const [selectedView, setSelectedView] = useState<'overview' | 'chapters' | 'schedule'>('overview');
@@ -55,8 +75,8 @@ const SmartPlanner: React.FC = () => {
     for (let d = today; d <= endDate; d = addDays(d, 1)) {
       const existing = getPlannerDayByDate(d.toISOString());
       if (!existing) {
-        const isOffDay = offDays.some(off => isSameDay(new Date(off.date), d));
-        const isExamDay = exams.some(exam => isSameDay(new Date(exam.date), d));
+        const isOffDay = offDays.some((off: any) => isSameDay(new Date(off.date), d));
+        const isExamDay = exams.some((exam: any) => isSameDay(new Date(exam.date), d));
         
         let dayType: PlannerDay['dayType'] = 'study';
         let availableHours = 4;
@@ -89,18 +109,18 @@ const SmartPlanner: React.FC = () => {
   const stats = {
     totalChapters: progressData.totalChapters,
     completedChapters: progressData.inProgressChapters, // Use chapters with at least one activity done
-    totalStudyHours: chapters.reduce((sum, c) => sum + (c.studyHours || 0), 0),
-    totalRevisionHours: chapters.reduce((sum, c) => sum + (c.revisionHours || 0), 0),
-    completedStudyHours: chapters.reduce((sum, c) => sum + (c.completedStudyHours || 0), 0),
-    completedRevisionHours: chapters.reduce((sum, c) => sum + (c.completedRevisionHours || 0), 0),
+    totalStudyHours: chapters.reduce((sum: any, c: any) => sum + (c.studyHours || 0), 0),
+    totalRevisionHours: chapters.reduce((sum: any, c: any) => sum + (c.revisionHours || 0), 0),
+    completedStudyHours: chapters.reduce((sum: any, c: any) => sum + (c.completedStudyHours || 0), 0),
+    completedRevisionHours: chapters.reduce((sum: any, c: any) => sum + (c.completedRevisionHours || 0), 0),
   };
   
   const progressPercentage = progressData.progressPercentage;
 
   // Get next exam
   const nextExam = exams
-    .filter(e => new Date(e.date) > new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
+    .filter((e: any) => new Date(e.date) > new Date())
+    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())[0];
   
   const daysUntilExam = nextExam 
     ? Math.ceil((new Date(nextExam.date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
@@ -113,9 +133,9 @@ const SmartPlanner: React.FC = () => {
   };
 
   const handleDeleteSubject = (subject: string) => {
-    const subjectChapters = chapters.filter(c => c.subject === subject);
+    const subjectChapters = chapters.filter((c: any) => c.subject === subject);
     if (confirm(`Delete all ${subjectChapters.length} chapters in ${subject}?`)) {
-      subjectChapters.forEach(c => deleteChapter(c.id));
+      subjectChapters.forEach((c: any) => deleteChapter(c.id));
     }
   };
 
