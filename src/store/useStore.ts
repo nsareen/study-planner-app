@@ -79,6 +79,7 @@ interface StoreActions {
   // Timer actions (NEW)
   updateTimerState: (updates: Partial<TimerState>) => void;
   resetTimer: () => void;
+  getElapsedTime: (assignmentId?: string) => number; // Returns elapsed time in seconds
   
   // Settings actions
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -1494,7 +1495,17 @@ export const useStore = create<Store>()(
           
           // Add session to activity sessions
           const updatedSessions = [...(state.getActivitySessions() || []), newSession];
-          
+
+          // Create new timer state
+          const newTimer: TimerState = {
+            sessionId: newSession.sessionId,
+            assignmentId,
+            startTime: new Date(newSession.startTime).getTime(),
+            totalPausedMs: 0,
+            isActive: true,
+            plannedMinutes: assignment.plannedMinutes
+          };
+
           return {
             userData: {
               ...state.userData,
@@ -1502,28 +1513,12 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 chapterAssignments: updatedAssignments,
                 activitySessions: updatedSessions,
-                activeTimer: {
-                  isRunning: true,
-                  isPaused: false,
-                  elapsedTime: 0,
-                  plannedTime: assignment.plannedMinutes * 60,
-                  overtimeAllowed: true,
-                  warningShown: false,
-                  completionAlertShown: false
-                }
+                activeTimer: newTimer
               }
             },
             chapterAssignments: updatedAssignments,
             activitySessions: updatedSessions,
-            activeTimer: {
-              isRunning: true,
-              isPaused: false,
-              elapsedTime: 0,
-              plannedTime: assignment.plannedMinutes * 60,
-              overtimeAllowed: true,
-              warningShown: false,
-              completionAlertShown: false
-            }
+            activeTimer: newTimer
           };
         }),
       
@@ -1585,6 +1580,14 @@ export const useStore = create<Store>()(
             a.id === session.assignmentId ? { ...a, status: 'paused' as const, pausedAt } : a
           );
           
+          // Update timer state for pause
+          const updatedTimer = state.getActiveTimer();
+          const pausedTimer = updatedTimer ? {
+            ...updatedTimer,
+            currentPauseStart: new Date(pausedAt).getTime(),
+            isActive: false
+          } : undefined;
+
           return {
             userData: {
               ...state.userData,
@@ -1592,12 +1595,12 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 chapterAssignments: updatedAssignments,
                 activitySessions: updatedSessions,
-                activeTimer: state.getActiveTimer() ? { ...state.getActiveTimer()!, isPaused: true, isRunning: false } as any : undefined
+                activeTimer: pausedTimer
               }
             },
             chapterAssignments: updatedAssignments,
             activitySessions: updatedSessions,
-            activeTimer: state.getActiveTimer() ? { ...state.getActiveTimer()!, isPaused: true, isRunning: false } as any : undefined
+            activeTimer: pausedTimer
           };
         }),
       
@@ -1648,8 +1651,18 @@ export const useStore = create<Store>()(
             a.id === session.assignmentId ? { ...a, status: 'in-progress' as const, pausedAt: undefined } : a
           );
           
-          // Resume successful
-          
+          // Update timer state for resume
+          const currentTimer = state.getActiveTimer();
+          const resumedTimer = currentTimer && currentTimer.currentPauseStart ? {
+            ...currentTimer,
+            totalPausedMs: currentTimer.totalPausedMs + (new Date(resumedAt).getTime() - currentTimer.currentPauseStart),
+            currentPauseStart: undefined,
+            isActive: true
+          } : currentTimer ? {
+            ...currentTimer,
+            isActive: true
+          } : undefined;
+
           return {
             userData: {
               ...state.userData,
@@ -1657,12 +1670,12 @@ export const useStore = create<Store>()(
                 ...state.userData[state.currentUserId],
                 chapterAssignments: updatedAssignments,
                 activitySessions: updatedSessions,
-                activeTimer: state.getActiveTimer() ? { ...state.getActiveTimer()!, isPaused: false, isRunning: true } as any : undefined
+                activeTimer: resumedTimer
               }
             },
             chapterAssignments: updatedAssignments,
             activitySessions: updatedSessions,
-            activeTimer: state.getActiveTimer() ? { ...state.getActiveTimer()!, isPaused: false, isRunning: true } as any : undefined
+            activeTimer: resumedTimer
           };
         }),
       
@@ -2242,9 +2255,9 @@ export const useStore = create<Store>()(
           
           // Check if we have any active sessions left
           const hasActiveSessions = validSessions.some(s => s.isActive);
-          
+
           // If timer is running but no active sessions, stop the timer
-          const shouldResetTimer = state.getActiveTimer()?.isRunning && !hasActiveSessions;
+          const shouldResetTimer = state.getActiveTimer()?.isActive && !hasActiveSessions;
           
           return {
             userData: {
@@ -2329,6 +2342,28 @@ export const useStore = create<Store>()(
         const state = get();
         if (!state.currentUserId) return undefined;
         return state.userData[state.currentUserId]?.activeTimer;
+      },
+
+      getElapsedTime: (assignmentId?: string) => {
+        const state = get();
+        if (!state.currentUserId) return 0;
+
+        const timer = state.getActiveTimer();
+        if (!timer) return 0;
+
+        // If assignmentId is provided, check if it matches
+        if (assignmentId && timer.assignmentId !== assignmentId) return 0;
+
+        const now = Date.now();
+        let elapsed = now - timer.startTime - timer.totalPausedMs;
+
+        // If currently paused, subtract the current pause duration
+        if (timer.currentPauseStart) {
+          elapsed -= (now - timer.currentPauseStart);
+        }
+
+        // Return elapsed time in seconds
+        return Math.max(0, Math.floor(elapsed / 1000));
       },
       };
     },

@@ -559,8 +559,8 @@ Your current data will be replaced. Continue?`;
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Timer Status</span>
-                  <span className={`text-sm font-medium ${activeTimer?.isRunning ? 'text-green-600' : 'text-gray-600'}`}>
-                    {activeTimer?.isRunning ? 'Running' : 'Stopped'}
+                  <span className={`text-sm font-medium ${activeTimer?.isActive ? 'text-green-600' : 'text-gray-600'}`}>
+                    {activeTimer?.isActive ? 'Running' : 'Stopped'}
                   </span>
                 </div>
               </div>
