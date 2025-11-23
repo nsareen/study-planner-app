@@ -72,10 +72,9 @@ const TodayPlan: React.FC = () => {
   };
   
   const handleStartActivity = (assignmentId: string) => {
-    // Don't start if there's already an active session
-    if (activeSession) {
-      alert('Please complete or pause the current activity before starting a new one.');
-      return;
+    // Auto-pause current session if switching to a new task
+    if (activeSession && activeSession.assignmentId !== assignmentId) {
+      pauseActivity(activeSession.sessionId);
     }
     startActivity(assignmentId);
   };
