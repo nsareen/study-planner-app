@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus, BookOpen, Clock, CheckCircle, Circle, Trash2, Edit, HelpCircle, Lightbulb, Download, Zap, Brain } from 'lucide-react';
+import { Plus, BookOpen, Clock, CheckCircle, Circle, Trash2, Edit, HelpCircle, Lightbulb, Download, Zap, Brain, Loader2 } from 'lucide-react';
 import { getSubjectStats } from '../utils/prioritization';
+import { backendChapterOps } from '../store/backendStore';
 import CurriculumImport from '../components/CurriculumImport';
 import SmartChapterSuggest from '../components/SmartChapterSuggest';
 import ConfirmDialog, { useConfirmDialog } from '../components/ConfirmDialog';
 
 const Subjects: React.FC = () => {
   const chapters = useStore((state) => state.getChapters());
-  const addChapter = useStore((state) => state.addChapter);
-  const updateChapter = useStore((state) => state.updateChapter);
-  const deleteChapter = useStore((state) => state.deleteChapter);
-  const clearAllChapters = useStore((state) => state.clearAllChapters);
   const { dialogState, showConfirm, hideConfirm } = useConfirmDialog();
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCurriculumImport, setShowCurriculumImport] = useState(false);
@@ -22,29 +19,52 @@ const Subjects: React.FC = () => {
     name: '',
     estimatedHours: 1,
   });
+
+  // Loading states for backend operations
+  const [operationLoading, setOperationLoading] = useState<{
+    action: 'add' | 'update' | 'delete' | 'clearAll' | null;
+    chapterId?: string;
+  }>({ action: null });
   
   const subjectStats = getSubjectStats(chapters);
   const subjects = Array.from(subjectStats.keys());
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (editingChapter) {
-      updateChapter(editingChapter, formData);
-      setEditingChapter(null);
+      setOperationLoading({ action: 'update', chapterId: editingChapter });
+      try {
+        await backendChapterOps.updateChapter(editingChapter, formData);
+        setEditingChapter(null);
+        setFormData({ subject: '', name: '', estimatedHours: 1 });
+        setShowAddForm(false);
+      } catch (error) {
+        console.error('Failed to update chapter:', error);
+      } finally {
+        setOperationLoading({ action: null });
+      }
     } else {
-      addChapter({
-        ...formData,
-        studyHours: formData.estimatedHours || 2,
-        revisionHours: 1,
-        completedStudyHours: 0,
-        completedRevisionHours: 0,
-        studyStatus: 'not-done' as const,
-        revisionStatus: 'not-done' as const,
-        confidence: 'medium' as const
-      });
+      setOperationLoading({ action: 'add' });
+      try {
+        await backendChapterOps.addChapter({
+          ...formData,
+          studyHours: formData.estimatedHours || 2,
+          revisionHours: 1,
+          completedStudyHours: 0,
+          completedRevisionHours: 0,
+          studyStatus: 'not-done' as const,
+          revisionStatus: 'not-done' as const,
+          confidence: 'medium' as const
+        });
+        setFormData({ subject: '', name: '', estimatedHours: 1 });
+        setShowAddForm(false);
+      } catch (error) {
+        console.error('Failed to add chapter:', error);
+      } finally {
+        setOperationLoading({ action: null });
+      }
     }
-    setFormData({ subject: '', name: '', estimatedHours: 1 });
-    setShowAddForm(false);
   };
   
   const handleEdit = (chapter: any) => {
@@ -61,6 +81,31 @@ const Subjects: React.FC = () => {
     setFormData({ subject: '', name: '', estimatedHours: 1 });
     setEditingChapter(null);
     setShowAddForm(false);
+  };
+
+  const handleDelete = async (chapterId: string) => {
+    setOperationLoading({ action: 'delete', chapterId });
+    try {
+      await backendChapterOps.deleteChapter(chapterId);
+    } catch (error) {
+      console.error('Failed to delete chapter:', error);
+    } finally {
+      setOperationLoading({ action: null });
+    }
+  };
+
+  const handleClearAll = async () => {
+    setOperationLoading({ action: 'clearAll' });
+    try {
+      const clearAllChapters = useStore.getState().clearAllChapters;
+      clearAllChapters();
+      // Note: clearAllChapters doesn't have a backend operation yet
+      // This will be handled by bulk sync operations in the future
+    } catch (error) {
+      console.error('Failed to clear all chapters:', error);
+    } finally {
+      setOperationLoading({ action: null });
+    }
   };
   
   const getProgressPercentage = (completed: number, total: number) => {
@@ -104,13 +149,18 @@ const Subjects: React.FC = () => {
                 onClick={() => showConfirm(
                   'Clear All Chapters',
                   'Are you sure you want to delete all chapters? This will remove all your study progress and cannot be undone.',
-                  clearAllChapters,
+                  handleClearAll,
                   'danger'
                 )}
-                className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-4 py-2 rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-semibold"
+                disabled={operationLoading.action === 'clearAll'}
+                className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-4 py-2 rounded-xl hover:shadow-lg transition-all flex items-center gap-2 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Trash2 size={16} />
-                Clear All (Test)
+                {operationLoading.action === 'clearAll' ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Trash2 size={16} />
+                )}
+                {operationLoading.action === 'clearAll' ? 'Clearing...' : 'Clear All (Test)'}
               </button>
             )}
           </div>
@@ -211,14 +261,19 @@ const Subjects: React.FC = () => {
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-xl hover:shadow-lg transition-all font-semibold"
+                  disabled={operationLoading.action === 'add' || operationLoading.action === 'update'}
+                  className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-xl hover:shadow-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  {editingChapter ? 'Update' : 'Add'} Chapter
+                  {(operationLoading.action === 'add' || operationLoading.action === 'update') && (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  )}
+                  {operationLoading.action === 'add' ? 'Adding...' : operationLoading.action === 'update' ? 'Updating...' : editingChapter ? 'Update Chapter' : 'Add Chapter'}
                 </button>
                 <button
                   type="button"
                   onClick={handleCancel}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all font-semibold"
+                  disabled={operationLoading.action === 'add' || operationLoading.action === 'update'}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
@@ -322,7 +377,8 @@ const Subjects: React.FC = () => {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleEdit(chapter)}
-                            className="p-1 text-gray-600 hover:text-primary-600 transition-colors"
+                            disabled={operationLoading.action !== null}
+                            className="p-1 text-gray-600 hover:text-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Edit size={16} />
                           </button>
@@ -330,12 +386,17 @@ const Subjects: React.FC = () => {
                             onClick={() => showConfirm(
                               'Delete Chapter',
                               `Are you sure you want to delete "${chapter.name}"? This action cannot be undone.`,
-                              () => deleteChapter(chapter.id),
+                              () => handleDelete(chapter.id),
                               'danger'
                             )}
-                            className="p-1 text-gray-600 hover:text-red-600 transition-colors"
+                            disabled={operationLoading.action === 'delete' && operationLoading.chapterId === chapter.id}
+                            className="p-1 text-gray-600 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Trash2 size={16} />
+                            {(operationLoading.action === 'delete' && operationLoading.chapterId === chapter.id) ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
                           </button>
                         </div>
                       </div>
