@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Clock, Play, Pause, Check, Calendar, Target, Trophy, Zap, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
+import QuickScheduler from '../components/QuickScheduler';
 
 const motivationalMessages = [
   "You're crushing it! 💪",
@@ -161,15 +162,24 @@ const TodayPlan: React.FC = () => {
         {/* Tasks List */}
         <div className="space-y-4">
           {todaysAssignments.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-700 mb-2">No Activities Scheduled for Today</h2>
-              <p className="text-gray-600 mb-4">
-                You haven't scheduled any chapters for today yet.
-              </p>
-              <p className="text-sm text-gray-500">
-                Go to the <span className="font-semibold">Plan</span> page to schedule chapters for today.
-              </p>
+            <div className="space-y-6">
+              {/* Empty State Header */}
+              <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+                <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-gray-700 mb-2">No Activities Scheduled for Today</h2>
+                <p className="text-gray-600">
+                  Quickly add chapters below, or go to the <span className="font-semibold text-purple-600">Smart Planner</span> to create a detailed schedule.
+                </p>
+              </div>
+
+              {/* Quick Scheduler */}
+              <QuickScheduler
+                date={todayStr}
+                onScheduled={() => {
+                  // Force re-render to show newly scheduled item
+                  forceUpdate(prev => prev + 1);
+                }}
+              />
             </div>
           ) : (
             <>
@@ -249,7 +259,7 @@ const TodayPlan: React.FC = () => {
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <BookOpen className="w-5 h-5 text-blue-500" />
                             <h3 className="text-xl font-bold text-gray-800">{chapter.subject}</h3>
                             <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
@@ -264,6 +274,11 @@ const TodayPlan: React.FC = () => {
                                isPaused ? 'PAUSED' :
                                assignment.status === 'in-progress' ? 'IN PROGRESS' : 'PENDING'}
                             </span>
+                            {assignment.planName && (
+                              <span className="px-2 py-1 rounded-md text-xs font-semibold bg-purple-100 text-purple-700 border border-purple-200">
+                                📋 {assignment.planName}
+                              </span>
+                            )}
                           </div>
                           <p className="text-gray-700 font-medium">{chapter.name}</p>
                         </div>
