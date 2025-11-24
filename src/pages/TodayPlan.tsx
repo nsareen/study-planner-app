@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Clock, Play, Pause, Check, Calendar, Target, Trophy, Zap, BookOpen } from 'lucide-react';
+import { backendSessionOps } from '../store/backendStore';
+import { Clock, Play, Pause, Check, Calendar, Target, Trophy, Zap, BookOpen, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import QuickScheduler from '../components/QuickScheduler';
 
@@ -19,12 +20,14 @@ const TodayPlan: React.FC = () => {
   const chapters = useStore((state) => state.getChapters());
   const chapterAssignments = useStore((state) => state.getChapterAssignments());
   const activitySessions = useStore((state) => state.getActivitySessions());
-  const startActivity = useStore((state) => state.startActivity);
-  const pauseActivity = useStore((state) => state.pauseActivity);
-  const resumeActivity = useStore((state) => state.resumeActivity);
-  const completeActivity = useStore((state) => state.completeActivity);
   const getActiveSession = useStore((state) => state.getActiveSession);
   const getElapsedTime = useStore((state) => state.getElapsedTime);
+
+  // Timer operation loading states
+  const [timerLoading, setTimerLoading] = useState<{
+    action: 'start' | 'pause' | 'resume' | 'complete' | null;
+    assignmentId?: string;
+  }>({ action: null });
 
   const [motivationalMessage, setMotivationalMessage] = useState(motivationalMessages[0]);
   const [, forceUpdate] = useState(0); // For forcing re-renders when timer updates
@@ -72,15 +75,45 @@ const TodayPlan: React.FC = () => {
     return `${minutes}:${String(secs).padStart(2, '0')}`;
   };
   
-  const handleStartActivity = (assignmentId: string) => {
-    // Auto-pause current session if switching to a new task
-    if (activeSession && activeSession.assignmentId !== assignmentId) {
-      pauseActivity(activeSession.sessionId);
+  const handleStartActivity = async (assignmentId: string) => {
+    setTimerLoading({ action: 'start', assignmentId });
+    try {
+      // Auto-pause current session if switching to a new task
+      if (activeSession && activeSession.assignmentId !== assignmentId) {
+        await backendSessionOps.pauseActivity(activeSession.sessionId);
+      }
+      await backendSessionOps.startActivity(assignmentId);
+    } catch (error) {
+      console.error('Failed to start activity:', error);
+      // Optimistic update already succeeded, so user can continue
+    } finally {
+      setTimerLoading({ action: null });
     }
-    startActivity(assignmentId);
   };
 
-  const handleCompleteActivity = (assignmentId: string) => {
+  const handlePauseActivity = async (sessionId: string) => {
+    setTimerLoading({ action: 'pause' });
+    try {
+      await backendSessionOps.pauseActivity(sessionId);
+    } catch (error) {
+      console.error('Failed to pause activity:', error);
+    } finally {
+      setTimerLoading({ action: null });
+    }
+  };
+
+  const handleResumeActivity = async (sessionId: string) => {
+    setTimerLoading({ action: 'resume' });
+    try {
+      await backendSessionOps.resumeActivity(sessionId);
+    } catch (error) {
+      console.error('Failed to resume activity:', error);
+    } finally {
+      setTimerLoading({ action: null });
+    }
+  };
+
+  const handleCompleteActivity = async (assignmentId: string) => {
     if (!activeSession || activeSession.assignmentId !== assignmentId) return;
 
     const elapsedSeconds = getElapsedTime(assignmentId);
@@ -88,7 +121,14 @@ const TodayPlan: React.FC = () => {
     const confirmMessage = `Are you sure you want to complete this task?\n\nTime spent: ${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`;
 
     if (window.confirm(confirmMessage)) {
-      completeActivity(activeSession.sessionId, elapsedMinutes);
+      setTimerLoading({ action: 'complete', assignmentId });
+      try {
+        await backendSessionOps.completeActivity(activeSession.sessionId);
+      } catch (error) {
+        console.error('Failed to complete activity:', error);
+      } finally {
+        setTimerLoading({ action: null });
+      }
     }
   };
   
@@ -302,40 +342,60 @@ const TodayPlan: React.FC = () => {
                           {!isActive && !isPaused && assignment.status !== 'completed' && assignment.status !== 'in-progress' && (
                             <button
                               onClick={() => handleStartActivity(assignment.id)}
-                              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                              disabled={timerLoading.action === 'start' && timerLoading.assignmentId === assignment.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <Play size={16} />
-                              Start
+                              {(timerLoading.action === 'start' && timerLoading.assignmentId === assignment.id) ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Play size={16} />
+                              )}
+                              {(timerLoading.action === 'start' && timerLoading.assignmentId === assignment.id) ? 'Starting...' : 'Start'}
                             </button>
                           )}
                           
                           {isActive && activeSession?.isActive && (
                             <button
-                              onClick={() => pauseActivity(activeSession.sessionId)}
-                              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+                              onClick={() => handlePauseActivity(activeSession.sessionId)}
+                              disabled={timerLoading.action === 'pause'}
+                              className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <Pause size={16} />
-                              Pause
+                              {timerLoading.action === 'pause' ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Pause size={16} />
+                              )}
+                              {timerLoading.action === 'pause' ? 'Pausing...' : 'Pause'}
                             </button>
                           )}
-                          
+
                           {isPaused && activeSession && (
                             <button
-                              onClick={() => resumeActivity(activeSession.sessionId)}
-                              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                              onClick={() => handleResumeActivity(activeSession.sessionId)}
+                              disabled={timerLoading.action === 'resume'}
+                              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <Play size={16} />
-                              Resume
+                              {timerLoading.action === 'resume' ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Play size={16} />
+                              )}
+                              {timerLoading.action === 'resume' ? 'Resuming...' : 'Resume'}
                             </button>
                           )}
                           
                           {isActive && (
                             <button
                               onClick={() => handleCompleteActivity(assignment.id)}
-                              className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+                              disabled={timerLoading.action === 'complete' && timerLoading.assignmentId === assignment.id}
+                              className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <Check size={16} />
-                              Complete
+                              {(timerLoading.action === 'complete' && timerLoading.assignmentId === assignment.id) ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Check size={16} />
+                              )}
+                              {(timerLoading.action === 'complete' && timerLoading.assignmentId === assignment.id) ? 'Completing...' : 'Complete'}
                             </button>
                           )}
                         </div>

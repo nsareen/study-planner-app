@@ -2,16 +2,42 @@
 
 Last Updated: 2025-11-24
 
-## Current Sprint: Phase 5 - Backend Integration ✅ COMPLETE
+## Current Sprint: Phase 6 - Component Migration & Testing 🚧 IN PROGRESS
 
-**Goal:** Integrate Express.js backend with React frontend with optimistic updates
-**Milestone:** API client, backend store wrapper, data fetching hooks, integration guide
+**Goal:** Migrate all components to use backend integration, add loading states, test full stack
+**Milestone:** Complete component migration, offline mode, error handling, end-to-end testing
 
 ---
 
 ## 🔴 In Progress
 
-Phase 5 complete! Backend integration infrastructure ready - Components can now use backend sync
+### Phase 6 Implementation: Component Migration & Testing 🚧
+- **Status:** 0% - Starting component migration
+- **Started:** 2025-11-24
+- **GitHub Issue:** [#8](https://github.com/nsareen/study-planner-app/issues/8) 🔄 In Progress
+- **Current Task:** Migrating TodayPlan component
+- **Tasks:**
+  - [ ] Migrate TodayPlan to use backend operations
+  - [ ] Migrate Subjects page to use backend operations
+  - [ ] Add offline mode indicator to Layout
+  - [ ] Create Toast notification component
+  - [ ] Test full stack with real backend
+  - [ ] Update documentation with results
+
+### Testing Strategy & Coverage Improvement (Parallel Track)
+- **Status:** 25% - Audit complete, strategy documents in progress
+- **Started:** 2025-11-24
+- **GitHub Issue:** [#7](https://github.com/nsareen/study-planner-app/issues/7) 🔄 In Progress
+- **Objective:** Establish comprehensive testing strategy and improve coverage for all development work
+- **Current Progress:**
+  - ✅ Complete testing infrastructure audit (E2E: 70%, Unit: 2%, Store: 0%)
+  - ✅ Analyzed existing Playwright and Vitest setup
+  - ✅ Identified critical gaps (store tests, utility tests, component tests)
+  - ✅ Created GitHub issue #7 with testing roadmap
+  - 🔄 Creating comprehensive testing strategy document
+  - ⏳ Defining testing guidelines and standards
+  - ⏳ Designing testing infrastructure for Phase 4/5 backend
+  - ⏳ Creating testing requirements and templates
 
 ### Phase 5 Implementation: Backend Integration ✅ COMPLETE
 - **Status:** 100% - Core infrastructure complete
