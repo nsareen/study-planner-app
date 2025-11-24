@@ -200,8 +200,44 @@ const TodayPlan: React.FC = () => {
                 const isActive = activeSession?.assignmentId === assignment.id && activeSession?.isActive;
                 const isPaused = activeSession?.assignmentId === assignment.id && !activeSession?.isActive;
                 const taskTimer = getElapsedTime(assignment.id);
-                
-                if (!chapter) return null;
+                const hasTimeLogged = assignment.status === 'in-progress' || assignment.status === 'paused' || taskTimer > 0;
+
+                // Handle missing chapter with error card
+                if (!chapter) {
+                  return (
+                    <div
+                      key={assignment.id}
+                      className="bg-red-50 border-2 border-red-200 rounded-xl shadow-lg p-6"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                          <span className="text-2xl">⚠️</span>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-red-800 mb-2">
+                            Missing Chapter Data
+                          </h3>
+                          <p className="text-red-700 mb-3">
+                            This assignment references a chapter that no longer exists. The chapter may have been deleted.
+                          </p>
+                          <div className="bg-red-100 rounded-lg p-3 mb-3">
+                            <p className="text-sm text-red-800">
+                              <strong>Assignment ID:</strong> {assignment.id}<br />
+                              <strong>Chapter ID:</strong> {assignment.chapterId}<br />
+                              <strong>Date:</strong> {assignment.date}<br />
+                              <strong>Type:</strong> {assignment.activityType}<br />
+                              <strong>Planned Time:</strong> {Math.floor(assignment.plannedMinutes / 60)}h {assignment.plannedMinutes % 60}m
+                            </p>
+                          </div>
+                          <p className="text-sm text-red-600">
+                            <strong>Recommended action:</strong> Go to the Smart Planner and remove this assignment,
+                            or recreate the chapter if it was deleted by mistake.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
                 
                 return (
                   <div
@@ -288,13 +324,26 @@ const TodayPlan: React.FC = () => {
                             </button>
                           )}
                         </div>
-                        
-                        {isActive && (
-                          <div className="text-2xl font-mono font-bold text-purple-600">
-                            {formatTime(taskTimer)}
+
+                        {/* Show timer for active OR paused tasks */}
+                        {(isActive || isPaused) && (
+                          <div className="flex flex-col items-end gap-1">
+                            <div className={`text-2xl font-mono font-bold ${isActive ? 'text-purple-600' : 'text-yellow-600'}`}>
+                              {formatTime(taskTimer)}
+                            </div>
+                            {isPaused && (
+                              <span className="text-xs text-yellow-600 font-semibold">PAUSED</span>
+                            )}
                           </div>
                         )}
-                        
+
+                        {/* Show elapsed time for in-progress tasks that aren't currently active */}
+                        {!isActive && !isPaused && hasTimeLogged && assignment.status !== 'completed' && (
+                          <div className="text-sm text-gray-600">
+                            Time logged: {formatTime(taskTimer)}
+                          </div>
+                        )}
+
                         {assignment.status === 'completed' && assignment.actualMinutes && (
                           <div className="text-sm text-gray-600">
                             Completed in {Math.floor(assignment.actualMinutes / 60)}h {assignment.actualMinutes % 60}m
