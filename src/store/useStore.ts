@@ -129,6 +129,7 @@ const initialSettings: AppSettings = {
   colorTheme: 'default',
   parentModeEnabled: false,
   parentModePIN: '1234',
+  cloudSyncEnabled: false,
 };
 
 // Pre-configured users for the students

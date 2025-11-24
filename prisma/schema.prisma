@@ -1,0 +1,404 @@
+// Prisma Schema for Study Planner App
+// Database: PostgreSQL with Supabase
+// Generated: 2025-11-24
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER MANAGEMENT
+// ============================================================================
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String?  @unique
+  avatar    String   // Emoji or image URL
+  grade     String
+
+  // Gamification
+  streak            Int      @default(0)
+  level             Int      @default(1)
+  totalStudyMinutes Int      @default(0)
+  achievements      String[] // Array of achievement IDs
+
+  // Profile details
+  favoriteSubject    String?
+  motivationalQuote  String?
+  status             UserStatus @default(OFFLINE)
+
+  // Settings
+  dailyGoalMinutes   Int      @default(120)
+  notificationsEnabled Boolean @default(true)
+
+  // Relationships
+  chapters           Chapter[]
+  studyPlans         StudyPlan[]
+  assignments        ChapterAssignment[]
+  sessions           ActivitySession[]
+  exams              Exam[]
+  examGroups         ExamGroup[]
+  offDays            OffDay[]
+  dailyLogs          DailyLog[]
+  friends            Friendship[] @relation("UserFriends")
+  friendOf           Friendship[] @relation("FriendOfUser")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+enum UserStatus {
+  ONLINE
+  STUDYING
+  BREAK
+  OFFLINE
+}
+
+// ============================================================================
+// FRIENDSHIP & COLLABORATION
+// ============================================================================
+
+model Friendship {
+  id         String   @id @default(uuid())
+  userId     String
+  friendId   String
+  status     FriendshipStatus @default(PENDING)
+
+  user       User     @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend     User     @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@index([friendId])
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+// ============================================================================
+// STUDY CONTENT
+// ============================================================================
+
+model Chapter {
+  id                      String   @id @default(uuid())
+  userId                  String
+  subject                 String
+  name                    String
+  description             String?
+
+  // Study phase
+  studyHours              Float    @default(0)
+  completedStudyHours     Float    @default(0)
+  actualStudyHours        Float    @default(0)
+  studyStatus             PhaseStatus @default(NOT_DONE)
+
+  // Revision phase
+  revisionHours           Float    @default(0)
+  completedRevisionHours  Float    @default(0)
+  actualRevisionHours     Float    @default(0)
+  revisionStatus          PhaseStatus @default(NOT_DONE)
+
+  // Metadata
+  priority                Float?
+  confidence              ConfidenceLevel @default(MEDIUM)
+
+  // Timestamps
+  lastStudiedAt           DateTime?
+  lastRevisedAt           DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  // Relationships
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments             ChapterAssignment[]
+  sessions                ActivitySession[]
+
+  @@index([userId])
+  @@index([subject])
+  @@index([studyStatus])
+  @@index([revisionStatus])
+}
+
+enum PhaseStatus {
+  NOT_DONE
+  IN_PROGRESS
+  DONE
+}
+
+enum ConfidenceLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ============================================================================
+// STUDY PLANNING
+// ============================================================================
+
+model StudyPlan {
+  id              String   @id @default(uuid())
+  userId          String
+  name            String
+  description     String?
+  status          PlanStatus @default(DRAFT)
+
+  // Metadata
+  startDate       DateTime?
+  endDate         DateTime?
+  version         Int      @default(1)
+  isTemplate      Boolean  @default(false)
+  originalPlanId  String?  // For duplicated plans
+
+  // Relationships
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments     ChapterAssignment[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum PlanStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+// ============================================================================
+// SCHEDULING & ASSIGNMENTS
+// ============================================================================
+
+model ChapterAssignment {
+  id               String   @id @default(uuid())
+  userId           String
+  chapterId        String
+  planId           String?
+  date             String   // YYYY-MM-DD format
+  activityType     ActivityType
+
+  // Time tracking
+  plannedMinutes   Int
+  actualMinutes    Int?
+
+  // Status
+  status           AssignmentStatus @default(SCHEDULED)
+
+  // Timestamps
+  startTime        DateTime?
+  pausedAt         DateTime?
+  completedAt      DateTime?
+  endTime          DateTime?
+  createdAt        DateTime @default(now())
+
+  // Relationships
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chapter          Chapter   @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  plan             StudyPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  sessions         ActivitySession[]
+
+  @@index([userId])
+  @@index([chapterId])
+  @@index([planId])
+  @@index([date])
+  @@index([status])
+}
+
+enum ActivityType {
+  STUDY
+  REVISION
+}
+
+enum AssignmentStatus {
+  SCHEDULED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================================================
+// ACTIVITY TRACKING
+// ============================================================================
+
+model ActivitySession {
+  id              String   @id @default(uuid())
+  userId          String
+  assignmentId    String
+  chapterId       String
+  date            String   // YYYY-MM-DD format
+
+  // Time tracking
+  startTime       DateTime
+  endTime         DateTime?
+  duration        Int      @default(0) // Minutes
+  pausedIntervals Json     // Array of {pausedAt, resumedAt, duration}
+
+  // Status
+  isActive        Boolean  @default(true)
+
+  // Relationships
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignment      ChapterAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  chapter         Chapter   @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([assignmentId])
+  @@index([chapterId])
+  @@index([date])
+  @@index([isActive])
+}
+
+// ============================================================================
+// EXAMS & SCHEDULING
+// ============================================================================
+
+model ExamGroup {
+  id              String   @id @default(uuid())
+  userId          String
+  name            String
+  examType        ExamType
+  status          ExamGroupStatus @default(DRAFT)
+
+  // Date range
+  startDate       String?  // YYYY-MM-DD
+  endDate         String?  // YYYY-MM-DD
+
+  // Metadata
+  isTemplate      Boolean  @default(false)
+
+  // Relationships
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exams           Exam[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum ExamGroupStatus {
+  DRAFT
+  PUBLISHED
+  APPLIED
+  ARCHIVED
+}
+
+model Exam {
+  id              String   @id @default(uuid())
+  userId          String
+  examGroupId     String?
+  subject         String
+  date            String   // YYYY-MM-DD format
+  examType        ExamType
+  duration        Int?     // Minutes
+  totalMarks      Int?
+
+  // Metadata
+  syllabus        String?
+  notes           String?
+
+  // Relationships
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examGroup       ExamGroup? @relation(fields: [examGroupId], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([examGroupId])
+  @@index([date])
+  @@index([subject])
+}
+
+enum ExamType {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  MID_TERM
+  FINAL
+}
+
+model OffDay {
+  id              String   @id @default(uuid())
+  userId          String
+  date            String   // YYYY-MM-DD format
+  reason          String
+
+  // Relationships
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([date])
+}
+
+// ============================================================================
+// DAILY LOGS & TASKS
+// ============================================================================
+
+model DailyLog {
+  id              String   @id @default(uuid())
+  userId          String
+  date            String   // YYYY-MM-DD format
+
+  // Summary
+  totalMinutes    Int      @default(0)
+  completedTasks  Int      @default(0)
+  mood            Mood?
+  notes           String?
+
+  // Tasks (stored as JSON for flexibility)
+  tasks           Json     // Array of DailyTask objects
+
+  // Relationships
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}
+
+enum Mood {
+  GREAT
+  GOOD
+  OKAY
+  TIRED
+  STRESSED
+}
+
+// ============================================================================
+// SYNC & METADATA
+// ============================================================================
+
+model SyncMetadata {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  lastSyncAt      DateTime
+  deviceId        String
+  syncVersion     Int      @default(1)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}

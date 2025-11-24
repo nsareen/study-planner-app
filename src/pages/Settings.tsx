@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Save, Download, Upload, Trash2, Moon, Sun, Monitor, Palette, Lock, Shield, AlertTriangle, CheckCircle, RefreshCw, Activity, Clock } from 'lucide-react';
+import { Save, Download, Upload, Trash2, Moon, Sun, Monitor, Palette, Lock, Shield, AlertTriangle, CheckCircle, RefreshCw, Activity, Clock, Cloud, CloudOff } from 'lucide-react';
+import { syncService, SyncStatus } from '../services/syncService';
 import { themes } from '../utils/themes';
 import ConfirmDialog, { useConfirmDialog } from '../components/ConfirmDialog';
 import { prepareExportData, validateImportData } from '../store/dataSync';
@@ -30,6 +31,28 @@ const Settings: React.FC = () => {
   const [confirmNewPin, setConfirmNewPin] = useState('');
   const [pinChangeError, setPinChangeError] = useState('');
   const [integrityCheckResult, setIntegrityCheckResult] = useState<{ isValid: boolean; issues: string[] } | null>(null);
+
+  // Cloud sync state
+  const currentUserId = useStore((state) => state.currentUserId);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [serverHealthy, setServerHealthy] = useState<boolean | null>(null);
+
+  // Check server health on mount
+  useEffect(() => {
+    const checkHealth = async () => {
+      const healthy = await syncService.checkServerHealth();
+      setServerHealthy(healthy);
+
+      if (healthy && currentUserId && settings.cloudSyncEnabled) {
+        const status = await syncService.getSyncStatus(currentUserId);
+        setSyncStatus(status);
+      }
+    };
+
+    checkHealth();
+  }, [currentUserId, settings.cloudSyncEnabled]);
   
   const handleExport = () => {
     // Use the comprehensive export utility
@@ -167,6 +190,76 @@ Your current data will be replaced. Continue?`;
         return <Sun size={20} />;
       default:
         return <Monitor size={20} />;
+    }
+  };
+
+  // Cloud sync handlers
+  const handlePushToCloud = async () => {
+    if (!currentUserId) return;
+
+    setIsSyncing(true);
+    setSyncMessage(null);
+
+    try {
+      const exportData = prepareExportData(useStore.getState());
+      const result = await syncService.pushToCloud(currentUserId, exportData);
+
+      if (result.success) {
+        setSyncMessage({ type: 'success', text: 'Data successfully synced to cloud!' });
+        const status = await syncService.getSyncStatus(currentUserId);
+        setSyncStatus(status);
+      } else {
+        setSyncMessage({ type: 'error', text: result.error || 'Sync failed' });
+      }
+    } catch (error) {
+      setSyncMessage({ type: 'error', text: 'Sync failed. Please try again.' });
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncMessage(null), 5000);
+    }
+  };
+
+  const handlePullFromCloud = async () => {
+    if (!currentUserId) return;
+
+    if (!confirm('This will replace your local data with cloud data. Continue?')) {
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncMessage(null);
+
+    try {
+      const result = await syncService.pullFromCloud(currentUserId);
+
+      if (result.success && result.data) {
+        // Import cloud data to local store
+        const success = importData(result.data);
+
+        if (success) {
+          setSyncMessage({ type: 'success', text: 'Data successfully pulled from cloud!' });
+          const status = await syncService.getSyncStatus(currentUserId);
+          setSyncStatus(status);
+        } else {
+          setSyncMessage({ type: 'error', text: 'Failed to import cloud data' });
+        }
+      } else {
+        setSyncMessage({ type: 'error', text: result.error || 'Sync failed' });
+      }
+    } catch (error) {
+      setSyncMessage({ type: 'error', text: 'Sync failed. Please try again.' });
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncMessage(null), 5000);
+    }
+  };
+
+  const handleToggleCloudSync = async (enabled: boolean) => {
+    updateSettings({ cloudSyncEnabled: enabled });
+
+    if (enabled && currentUserId) {
+      const status = await syncService.getSyncStatus(currentUserId);
+      setSyncStatus(status);
     }
   };
   
@@ -449,7 +542,150 @@ Your current data will be replaced. Continue?`;
               )}
             </div>
           </div>
-          
+
+          {/* Cloud Sync Section */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              {settings.cloudSyncEnabled ? (
+                <Cloud className="w-5 h-5 text-blue-600" />
+              ) : (
+                <CloudOff className="w-5 h-5 text-gray-400" />
+              )}
+              Cloud Sync
+              {serverHealthy === false && (
+                <span className="text-xs text-red-500 font-normal">(Server offline)</span>
+              )}
+            </h3>
+
+            {/* Server status indicator */}
+            <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${
+              serverHealthy === null ? 'bg-gray-100 text-gray-700' :
+              serverHealthy ? 'bg-green-100 text-green-800' :
+              'bg-red-100 text-red-800'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                serverHealthy === null ? 'bg-gray-400' :
+                serverHealthy ? 'bg-green-500 animate-pulse' :
+                'bg-red-500'
+              }`} />
+              <span className="text-sm font-medium">
+                {serverHealthy === null ? 'Checking server...' :
+                 serverHealthy ? 'Server connected' :
+                 'Server offline - Cloud sync unavailable'}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              {/* Enable/Disable Toggle */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <h4 className="font-medium text-gray-900">Enable Cloud Sync</h4>
+                  <p className="text-sm text-gray-600">
+                    Automatically sync your data to the cloud for backup and access across devices
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleToggleCloudSync(!settings.cloudSyncEnabled)}
+                  disabled={!serverHealthy}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    settings.cloudSyncEnabled ? 'bg-blue-600' : 'bg-gray-300'
+                  } ${!serverHealthy ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      settings.cloudSyncEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Sync status display */}
+              {settings.cloudSyncEnabled && syncStatus && (
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-900">Sync Status</span>
+                    {syncStatus.synced ? (
+                      <CheckCircle className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                    )}
+                  </div>
+
+                  {syncStatus.lastSyncAt ? (
+                    <p className="text-sm text-blue-700">
+                      Last synced: {new Date(syncStatus.lastSyncAt).toLocaleString()}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-yellow-700">
+                      Never synced - Click "Push to Cloud" to backup your data
+                    </p>
+                  )}
+
+                  {syncStatus.needsSync && (
+                    <p className="text-sm text-yellow-700 mt-1">
+                      ⚠️ Local and cloud versions differ - sync recommended
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Sync action buttons */}
+              {settings.cloudSyncEnabled && (
+                <div className="space-y-3">
+                  <button
+                    onClick={handlePushToCloud}
+                    disabled={isSyncing || !serverHealthy}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSyncing ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Cloud className="w-5 h-5" />
+                    )}
+                    {isSyncing ? 'Syncing...' : 'Push to Cloud'}
+                  </button>
+
+                  <button
+                    onClick={handlePullFromCloud}
+                    disabled={isSyncing || !serverHealthy}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSyncing ? (
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Download className="w-5 h-5" />
+                    )}
+                    {isSyncing ? 'Syncing...' : 'Pull from Cloud'}
+                  </button>
+
+                  {syncMessage && (
+                    <div className={`p-3 rounded-lg ${
+                      syncMessage.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        {syncMessage.type === 'success' ? (
+                          <CheckCircle className="w-4 h-4" />
+                        ) : (
+                          <AlertTriangle className="w-4 h-4" />
+                        )}
+                        {syncMessage.text}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Info message when sync is disabled */}
+              {!settings.cloudSyncEnabled && (
+                <div className="p-4 bg-gray-100 rounded-lg">
+                  <p className="text-sm text-gray-700">
+                    Cloud sync is currently disabled. Enable it to backup your data to the cloud and access it across multiple devices.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           <div>
             <h3 className="text-lg font-semibold mb-4">Data Management</h3>
             <div className="space-y-3">

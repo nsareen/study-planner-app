@@ -149,6 +149,7 @@ export interface AppSettings {
   colorTheme: string;
   parentModeEnabled?: boolean;
   parentModePIN?: string;
+  cloudSyncEnabled?: boolean;
 }
 
 export interface UserProfile {
