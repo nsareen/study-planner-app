@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { AppState, Exam, ExamGroup, OffDay, Chapter, DailyLog, AppSettings, DailyTask, UserProfile, StudyPlan, ChapterStatus, SubjectConfig, PerformanceMetric, HistoricalPerformance, PlannerDay, PlannerTask, ChapterAssignment, ActivitySession, TimerState } from '../types';
 import { cleanupChapterData, cleanupStudyPlanData, prepareExportData, validateImportData, validateDataIntegrity } from './dataSync';
+import { ChapterCreateSchema, ChapterUpdateSchema } from '../schemas/chapter.schema';
+import { ChapterAssignmentCreateSchema } from '../schemas/assignment.schema';
+import { ActivitySessionCreateSchema } from '../schemas/session.schema';
 
 interface StoreActions {
   // User actions
@@ -598,24 +601,45 @@ export const useStore = create<Store>()(
       addChapter: (chapter) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
+
+          // Prepare chapter data for validation
+          const chapterData = {
+            subject: chapter.subject,
+            name: chapter.name,
+            studyHours: chapter.studyHours || chapter.estimatedHours || 2,
+            revisionHours: chapter.revisionHours || 1,
+            studyStatus: 'not-done' as const,
+            revisionStatus: 'not-done' as const,
+            description: chapter.description,
+            priority: chapter.priority,
+          };
+
+          // Validate with Zod schema
+          const validationResult = ChapterCreateSchema.safeParse(chapterData);
+          if (!validationResult.success) {
+            console.error('Chapter validation failed:', validationResult.error.errors);
+            return state; // Return unchanged state on validation failure
+          }
+
           const newChapter = {
             ...chapter,
             id: generateId(),
             completedHours: 0,
-            studyHours: chapter.studyHours || chapter.estimatedHours || 2,
-            revisionHours: chapter.revisionHours || 1,
+            studyHours: validationResult.data.studyHours,
+            revisionHours: validationResult.data.revisionHours,
             completedStudyHours: 0,
             completedRevisionHours: 0,
+            actualStudyHours: 0,
+            actualRevisionHours: 0,
             status: 'not_started' as const,
             studyProgress: 0,
-            studyStatus: 'not-done' as const,
-            revisionStatus: 'not-done' as const,
+            studyStatus: validationResult.data.studyStatus,
+            revisionStatus: validationResult.data.revisionStatus,
             confidence: 'medium' as const,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           };
-          
+
           const updatedUserData = {
             ...state.userData,
             [state.currentUserId]: {
@@ -623,7 +647,7 @@ export const useStore = create<Store>()(
               chapters: [...state.userData[state.currentUserId].chapters, newChapter],
             }
           };
-          
+
           return {
             userData: updatedUserData,
             chapters: updatedUserData[state.currentUserId].chapters,
@@ -634,12 +658,19 @@ export const useStore = create<Store>()(
         set((state) => {
           if (!state.currentUserId) return state;
 
+          // Validate with Zod schema (partial update)
+          const validationResult = ChapterUpdateSchema.safeParse({ id, ...chapter });
+          if (!validationResult.success) {
+            console.error('Chapter update validation failed:', validationResult.error.errors);
+            return state; // Return unchanged state on validation failure
+          }
+
           const updatedChapters = state.getChapters().map((c: any) =>
             c.id === id
               ? { ...c, ...chapter, updatedAt: new Date().toISOString() }
               : c
           );
-          
+
           return {
             userData: {
               ...state.userData,
@@ -1274,11 +1305,11 @@ export const useStore = create<Store>()(
       scheduleChapter: (chapterId, date, activityType, plannedMinutes, planId) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
+
           // If no planId provided, use active plan or create default
           let assignmentPlanId = planId;
           let planName: string | undefined;
-          
+
           if (!assignmentPlanId) {
             const activePlan = get().getOrCreateActivePlan();
             assignmentPlanId = activePlan.id;
@@ -1287,21 +1318,39 @@ export const useStore = create<Store>()(
             const plan = state.getStudyPlans()?.find(p => p.id === assignmentPlanId);
             planName = plan?.name;
           }
-          
-          const assignment: ChapterAssignment = {
-            id: generateId(),
+
+          // Prepare assignment data for validation
+          const assignmentData = {
             chapterId,
             date,
             activityType,
             plannedMinutes,
+            isActive: false,
+            planId: assignmentPlanId,
+            planName,
+          };
+
+          // Validate with Zod schema
+          const validationResult = ChapterAssignmentCreateSchema.safeParse(assignmentData);
+          if (!validationResult.success) {
+            console.error('Assignment validation failed:', validationResult.error.errors);
+            return state; // Return unchanged state on validation failure
+          }
+
+          const assignment: ChapterAssignment = {
+            id: generateId(),
+            chapterId: validationResult.data.chapterId,
+            date: validationResult.data.date,
+            activityType: validationResult.data.activityType,
+            plannedMinutes: validationResult.data.plannedMinutes,
             status: 'scheduled',
             createdAt: new Date().toISOString(),
             planId: assignmentPlanId,
             planName,
           };
-          
+
           const updatedAssignments = [...(state.getChapterAssignments() || []), assignment];
-          
+
           // Update plan's assignmentIds if it exists
           const updatedPlans = (state.getStudyPlans() || []).map(plan => {
             if (plan.id === assignmentPlanId) {
@@ -1313,7 +1362,7 @@ export const useStore = create<Store>()(
             }
             return plan;
           });
-          
+
           return {
             userData: {
               ...state.userData,
@@ -1489,28 +1538,44 @@ export const useStore = create<Store>()(
       startActivity: (assignmentId) =>
         set((state) => {
           if (!state.currentUserId) return state;
-          
+
           // Find the assignment
           const assignment = state.getChapterAssignments().find((a: any) => a.id === assignmentId);
           if (!assignment) return state;
-          
-          // Create new activity session
-          const newSession: ActivitySession = {
-            sessionId: generateId(),
+
+          // Prepare session data for validation
+          const sessionData = {
             assignmentId,
             chapterId: assignment.chapterId,
             startTime: new Date().toISOString(),
+            isActive: true,
+            date: assignment.date,
+          };
+
+          // Validate with Zod schema
+          const validationResult = ActivitySessionCreateSchema.safeParse(sessionData);
+          if (!validationResult.success) {
+            console.error('Activity session validation failed:', validationResult.error.errors);
+            return state; // Return unchanged state on validation failure
+          }
+
+          // Create new activity session
+          const newSession: ActivitySession = {
+            sessionId: generateId(),
+            assignmentId: validationResult.data.assignmentId,
+            chapterId: validationResult.data.chapterId,
+            startTime: validationResult.data.startTime,
             duration: 0,
             pausedIntervals: [],
-            isActive: true,
-            date: assignment.date
+            isActive: validationResult.data.isActive,
+            date: validationResult.data.date
           };
-          
+
           // Update assignment status to in-progress
           const updatedAssignments = state.getChapterAssignments().map(a =>
             a.id === assignmentId ? { ...a, status: 'in-progress' as const, startTime: newSession.startTime } : a
           );
-          
+
           // Add session to activity sessions
           const updatedSessions = [...(state.getActivitySessions() || []), newSession];
 
