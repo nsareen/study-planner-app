@@ -1,11 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Check, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Check, AlertTriangle, WifiOff, Wifi } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { useBackendSync } from '../hooks/useBackendSync';
 
 const SyncIndicator: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const { validateDataIntegrity, cleanupOrphanedData } = useStore();
+  const settings = useStore(state => state.getSettings());
+  const { syncState } = useBackendSync();
+
+  // Check if backend sync is enabled and if we're online
+  const isBackendEnabled = settings.cloudSyncEnabled;
+  const isOnline = syncState.isOnline;
   
   // Auto-check data integrity periodically
   useEffect(() => {
@@ -51,6 +58,17 @@ const SyncIndicator: React.FC = () => {
   }, [validateDataIntegrity, cleanupOrphanedData]);
   
   const getStatusIcon = () => {
+    // Show offline status first if backend is enabled but offline
+    if (isBackendEnabled && !isOnline) {
+      return <WifiOff className="w-4 h-4" />;
+    }
+
+    // Show online status if backend is enabled and online
+    if (isBackendEnabled && isOnline) {
+      return <Wifi className="w-4 h-4" />;
+    }
+
+    // Otherwise show data sync status
     switch (syncStatus) {
       case 'syncing':
         return <RefreshCw className="w-4 h-4 animate-spin" />;
@@ -64,6 +82,17 @@ const SyncIndicator: React.FC = () => {
   };
   
   const getStatusColor = () => {
+    // Offline status takes priority
+    if (isBackendEnabled && !isOnline) {
+      return 'text-orange-600 bg-orange-100';
+    }
+
+    // Online status with backend
+    if (isBackendEnabled && isOnline) {
+      return 'text-green-600 bg-green-100';
+    }
+
+    // Otherwise show data sync status color
     switch (syncStatus) {
       case 'syncing':
         return 'text-blue-600 bg-blue-100';
@@ -77,6 +106,17 @@ const SyncIndicator: React.FC = () => {
   };
   
   const getStatusText = () => {
+    // Offline status takes priority
+    if (isBackendEnabled && !isOnline) {
+      return 'Offline - Data saved locally';
+    }
+
+    // Online status with backend
+    if (isBackendEnabled && isOnline) {
+      return 'Online - Syncing to cloud';
+    }
+
+    // Otherwise show data sync status
     switch (syncStatus) {
       case 'syncing':
         return 'Syncing...';
@@ -85,9 +125,9 @@ const SyncIndicator: React.FC = () => {
       case 'error':
         return 'Sync Error';
       default:
-        return lastSyncTime 
+        return lastSyncTime
           ? `Last sync: ${lastSyncTime.toLocaleTimeString()}`
-          : 'Ready';
+          : 'Local storage only';
     }
   };
   
