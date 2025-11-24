@@ -17,6 +17,7 @@ Phase 3 complete! Core V2 features done - Ready for Phase 4 (Backend)
 - **Status:** 100% - Core planning features complete (3/3 implemented)
 - **Started:** 2025-11-24
 - **Completed:** 2025-11-24
+- **GitHub Issue:** [#4](https://github.com/nsareen/study-planner-app/issues/4) ✅ Closed
 - **Features Implemented:**
   - ✅ QuickScheduler component for instant chapter scheduling
   - ✅ Integrated QuickScheduler in TodayPlan empty state
@@ -26,6 +27,7 @@ Phase 3 complete! Core V2 features done - Ready for Phase 4 (Backend)
 - **Status:** 100% - All core UX issues fixed (3/3 completed)
 - **Started:** 2025-11-24
 - **Completed:** 2025-11-24
+- **GitHub Issue:** [#3](https://github.com/nsareen/study-planner-app/issues/3) ✅ Closed
 - **Features Implemented:**
   - ✅ Fixed timer display for paused tasks
   - ✅ Added error handling for missing chapters
@@ -35,6 +37,7 @@ Phase 3 complete! Core V2 features done - Ready for Phase 4 (Backend)
 - **Status:** 100% - All features complete (5/5 implemented)
 - **Started:** 2025-11-23
 - **Completed:** 2025-11-24
+- **GitHub Issue:** [#2](https://github.com/nsareen/study-planner-app/issues/2) ✅ Closed
 - **Features Implemented:**
   - ✅ Feature #8: Remove dual state tracking
   - ✅ Feature #9: Consolidate timer state
