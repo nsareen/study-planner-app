@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus, BookOpen, Clock } from 'lucide-react';
+import { backendAssignmentOps } from '../store/backendStore';
+import { Plus, BookOpen, Clock, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface QuickSchedulerProps {
@@ -10,11 +11,11 @@ interface QuickSchedulerProps {
 
 const QuickScheduler: React.FC<QuickSchedulerProps> = ({ date, onScheduled }) => {
   const chapters = useStore((state) => state.getChapters());
-  const scheduleChapter = useStore((state) => state.scheduleChapter);
   const chapterAssignments = useStore((state) => state.getChapterAssignments());
   const [selectedChapterId, setSelectedChapterId] = useState<string>('');
   const [activityType, setActivityType] = useState<'study' | 'revision'>('study');
   const [minutes, setMinutes] = useState<number>(60);
+  const [isScheduling, setIsScheduling] = useState(false);
 
   const today = date || format(new Date(), 'yyyy-MM-dd');
 
@@ -25,16 +26,27 @@ const QuickScheduler: React.FC<QuickSchedulerProps> = ({ date, onScheduled }) =>
 
   const availableChapters = chapters.filter((c: any) => !scheduledChapterIds.includes(c.id));
 
-  const handleQuickSchedule = () => {
-    if (!selectedChapterId) return;
+  const handleQuickSchedule = async () => {
+    if (!selectedChapterId || isScheduling) return;
 
-    scheduleChapter(selectedChapterId, today, activityType, minutes);
-    setSelectedChapterId('');
-    setMinutes(60);
-    setActivityType('study');
+    setIsScheduling(true);
 
-    if (onScheduled) {
-      onScheduled();
+    try {
+      // Use backend operation (optimistic update + background sync)
+      await backendAssignmentOps.scheduleChapter(selectedChapterId, today, activityType, minutes);
+
+      setSelectedChapterId('');
+      setMinutes(60);
+      setActivityType('study');
+
+      if (onScheduled) {
+        onScheduled();
+      }
+    } catch (error) {
+      console.error('Failed to schedule chapter:', error);
+      // Error is already handled in backendAssignmentOps (optimistic update succeeded)
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -150,15 +162,24 @@ const QuickScheduler: React.FC<QuickSchedulerProps> = ({ date, onScheduled }) =>
         {/* Add Button */}
         <button
           onClick={handleQuickSchedule}
-          disabled={!selectedChapterId}
-          className={`w-full py-4 rounded-lg font-bold text-lg transition-all ${
-            selectedChapterId
+          disabled={!selectedChapterId || isScheduling}
+          className={`w-full py-4 rounded-lg font-bold text-lg transition-all flex items-center justify-center gap-2 ${
+            selectedChapterId && !isScheduling
               ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-xl hover:scale-105'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
-          <Plus className="w-5 h-5 inline mr-2" />
-          Add to Today's Plan
+          {isScheduling ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Scheduling...
+            </>
+          ) : (
+            <>
+              <Plus className="w-5 h-5" />
+              Add to Today's Plan
+            </>
+          )}
         </button>
       </div>
 
