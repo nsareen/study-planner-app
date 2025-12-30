@@ -2690,4 +2690,2999 @@ describe('useStore - User Management', () => {
       });
     });
   });
+
+  describe('Study Plan Advanced Operations', () => {
+    describe('duplicateStudyPlan', () => {
+      it('should create duplicate plan with new name', () => {
+        const { result } = renderHook(() => useStore());
+
+        let planId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addStudyPlan({
+            name: 'Original Plan',
+            description: 'Test plan',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'active',
+          });
+
+          planId = result.current.getStudyPlans()[0].id;
+
+          result.current.duplicateStudyPlan(planId, 'Duplicated Plan');
+        });
+
+        const plans = result.current.getStudyPlans();
+        expect(plans).toHaveLength(2);
+        expect(plans[0].name).toBe('Original Plan');
+        expect(plans[1].name).toBe('Duplicated Plan');
+        expect(plans[1].id).not.toBe(planId);
+      });
+
+      it('should preserve plan properties in duplicate', () => {
+        const { result } = renderHook(() => useStore());
+
+        let planId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addStudyPlan({
+            name: 'Original Plan',
+            description: 'Detailed description',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 10,
+            completedRevisionHours: 5,
+            status: 'active',
+          });
+
+          planId = result.current.getStudyPlans()[0].id;
+
+          result.current.duplicateStudyPlan(planId, 'Copy');
+        });
+
+        const duplicate = result.current.getStudyPlans()[1];
+        expect(duplicate.description).toBe('Detailed description');
+        expect(duplicate.startDate).toBe('2025-11-01');
+        expect(duplicate.endDate).toBe('2025-12-31');
+        expect(duplicate.totalStudyHours).toBe(100);
+        expect(duplicate.totalRevisionHours).toBe(50);
+      });
+
+      it('should handle duplicating non-existent plan', () => {
+        const { result } = renderHook(() => useStore());
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addStudyPlan({
+            name: 'Test Plan',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          result.current.duplicateStudyPlan('non-existent-id', 'Copy');
+        });
+
+        const plans = result.current.getStudyPlans();
+        expect(plans).toHaveLength(1);
+      });
+    });
+
+    describe('setActiveStudyPlan', () => {
+      it('should set active study plan', () => {
+        const { result } = renderHook(() => useStore());
+
+        let planId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addStudyPlan({
+            name: 'Plan 1',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          planId = result.current.getStudyPlans()[0].id;
+
+          result.current.setActiveStudyPlan(planId);
+        });
+
+        const activePlanId = result.current.getActiveStudyPlanId();
+        expect(activePlanId).toBe(planId);
+      });
+
+      it('should switch active plan', () => {
+        const { result } = renderHook(() => useStore());
+
+        let plan1Id: string;
+        let plan2Id: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addStudyPlan({
+            name: 'Plan 1',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          result.current.addStudyPlan({
+            name: 'Plan 2',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 80,
+            totalRevisionHours: 40,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          plan1Id = result.current.getStudyPlans()[0].id;
+          plan2Id = result.current.getStudyPlans()[1].id;
+
+          result.current.setActiveStudyPlan(plan1Id);
+        });
+
+        expect(result.current.getActiveStudyPlanId()).toBe(plan1Id);
+
+        act(() => {
+          result.current.setActiveStudyPlan(plan2Id);
+        });
+
+        expect(result.current.getActiveStudyPlanId()).toBe(plan2Id);
+      });
+
+      it('should handle setting active plan with no user', () => {
+        const { result } = renderHook(() => useStore());
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+          result.current.logoutUser();
+
+          result.current.setActiveStudyPlan('some-id');
+        });
+
+        const activePlanId = result.current.getActiveStudyPlanId();
+        expect(activePlanId).toBeUndefined();
+      });
+    });
+
+    describe('deleteStudyPlan', () => {
+      it('should delete study plan', () => {
+        const { result } = renderHook(() => useStore());
+
+        let planId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addStudyPlan({
+            name: 'Test Plan',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          planId = result.current.getStudyPlans()[0].id;
+
+          result.current.deleteStudyPlan(planId);
+        });
+
+        const plans = result.current.getStudyPlans();
+        expect(plans).toHaveLength(0);
+      });
+
+      it('should clear active plan ID when deleting active plan', () => {
+        const { result } = renderHook(() => useStore());
+
+        let planId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addStudyPlan({
+            name: 'Test Plan',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          planId = result.current.getStudyPlans()[0].id;
+          result.current.setActiveStudyPlan(planId);
+
+          result.current.deleteStudyPlan(planId);
+        });
+
+        const activePlanId = result.current.getActiveStudyPlanId();
+        expect(activePlanId).toBeUndefined();
+      });
+
+      it('should not affect other plans', () => {
+        const { result } = renderHook(() => useStore());
+
+        let plan1Id: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addStudyPlan({
+            name: 'Plan 1',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          result.current.addStudyPlan({
+            name: 'Plan 2',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 80,
+            totalRevisionHours: 40,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          plan1Id = result.current.getStudyPlans()[0].id;
+
+          result.current.deleteStudyPlan(plan1Id);
+        });
+
+        const plans = result.current.getStudyPlans();
+        expect(plans).toHaveLength(1);
+        expect(plans[0].name).toBe('Plan 2');
+      });
+
+      it('should delete plan with assignments', () => {
+        const { result } = renderHook(() => useStore());
+
+        let planId: string;
+        let chapterId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+
+          chapterId = result.current.getChapters()[0].id;
+
+          result.current.addStudyPlan({
+            name: 'Test Plan',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          planId = result.current.getStudyPlans()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60, planId);
+
+          result.current.deleteStudyPlan(planId);
+        });
+
+        // Verify plan was deleted
+        const plans = result.current.getStudyPlans();
+        expect(plans).toHaveLength(0);
+
+        // Verify assignment still exists (plan deletion doesn't remove assignments)
+        const assignments = result.current.getChapterAssignments();
+        expect(assignments).toHaveLength(1);
+      });
+
+      it('should handle deleting non-existent plan', () => {
+        const { result } = renderHook(() => useStore());
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addStudyPlan({
+            name: 'Test Plan',
+            startDate: '2025-11-01',
+            endDate: '2025-12-31',
+            totalStudyHours: 100,
+            totalRevisionHours: 50,
+            completedStudyHours: 0,
+            completedRevisionHours: 0,
+            status: 'draft',
+          });
+
+          result.current.deleteStudyPlan('non-existent-id');
+        });
+
+        const plans = result.current.getStudyPlans();
+        expect(plans).toHaveLength(1);
+      });
+    });
+  });
+
+  describe('Activity Session Management', () => {
+    describe('startActivity', () => {
+      it('should create new activity session with correct structure', () => {
+        const { result } = renderHook(() => useStore());
+
+        let chapterId: string;
+        let assignmentId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+        });
+
+        const sessions = result.current.getActivitySessions();
+        expect(sessions).toHaveLength(1);
+
+        const session = sessions[0];
+        expect(session).toMatchObject({
+          sessionId: expect.any(String),
+          assignmentId,
+          chapterId,
+          duration: 0,
+          pausedIntervals: [],
+          isActive: true,
+          date: '2025-11-25',
+        });
+        expect(session.startTime).toBeDefined();
+        expect(session.endTime).toBeUndefined();
+      });
+
+      it('should update assignment status to in-progress', () => {
+        const { result } = renderHook(() => useStore());
+
+        let assignmentId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+        });
+
+        const assignments = result.current.getChapterAssignments();
+        const assignment = assignments.find(a => a.id === assignmentId);
+        expect(assignment?.status).toBe('in-progress');
+        expect(assignment?.startTime).toBeDefined();
+      });
+
+      it('should create active timer state', () => {
+        const { result } = renderHook(() => useStore());
+
+        let assignmentId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+        });
+
+        const timer = result.current.getActiveTimer();
+        expect(timer).toBeDefined();
+        expect(timer).toMatchObject({
+          assignmentId,
+          isActive: true,
+          totalPausedMs: 0,
+          plannedMinutes: 60,
+        });
+        expect(timer!.sessionId).toBeDefined();
+        expect(timer!.startTime).toBeGreaterThan(0);
+      });
+
+      it('should not start activity for non-existent assignment', () => {
+        const { result } = renderHook(() => useStore());
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+          result.current.startActivity('non-existent-id');
+        });
+
+        const sessions = result.current.getActivitySessions();
+        expect(sessions).toHaveLength(0);
+      });
+    });
+
+    describe('pauseActivity', () => {
+      it('should pause active session', () => {
+        const { result } = renderHook(() => useStore());
+
+        let sessionId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          const assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+          sessionId = result.current.getActivitySessions()[0].sessionId;
+
+          result.current.pauseActivity(sessionId);
+        });
+
+        const sessions = result.current.getActivitySessions();
+        const session = sessions[0];
+
+        expect(session.isActive).toBe(false);
+        expect(session.pausedIntervals).toHaveLength(1);
+        expect(session.pausedIntervals[0].pausedAt).toBeDefined();
+        expect(session.pausedIntervals[0].resumedAt).toBeUndefined();
+      });
+
+      it('should update assignment status to paused', () => {
+        const { result } = renderHook(() => useStore());
+
+        let sessionId: string;
+        let assignmentId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+          sessionId = result.current.getActivitySessions()[0].sessionId;
+
+          result.current.pauseActivity(sessionId);
+        });
+
+        const assignments = result.current.getChapterAssignments();
+        const assignment = assignments.find(a => a.id === assignmentId);
+        expect(assignment?.status).toBe('paused');
+        expect(assignment?.pausedAt).toBeDefined();
+      });
+
+      it('should not pause already paused session', () => {
+        const { result } = renderHook(() => useStore());
+
+        let sessionId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          const assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+          sessionId = result.current.getActivitySessions()[0].sessionId;
+
+          result.current.pauseActivity(sessionId);
+          result.current.pauseActivity(sessionId); // Try to pause again
+        });
+
+        const sessions = result.current.getActivitySessions();
+        const session = sessions[0];
+
+        // Should still have only one pause interval
+        expect(session.pausedIntervals).toHaveLength(1);
+        expect(session.isActive).toBe(false);
+      });
+    });
+
+    describe('resumeActivity', () => {
+      it('should resume paused session', () => {
+        const { result } = renderHook(() => useStore());
+
+        let sessionId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          const assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+          sessionId = result.current.getActivitySessions()[0].sessionId;
+
+          result.current.pauseActivity(sessionId);
+          result.current.resumeActivity(sessionId);
+        });
+
+        const sessions = result.current.getActivitySessions();
+        const session = sessions[0];
+
+        expect(session.isActive).toBe(true);
+        expect(session.pausedIntervals).toHaveLength(1);
+        expect(session.pausedIntervals[0].resumedAt).toBeDefined();
+        expect(session.pausedIntervals[0].duration).toBeDefined();
+      });
+
+      it('should handle multiple pause/resume cycles', () => {
+        const { result } = renderHook(() => useStore());
+
+        let sessionId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          const assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+          sessionId = result.current.getActivitySessions()[0].sessionId;
+
+          // First pause/resume cycle
+          result.current.pauseActivity(sessionId);
+          result.current.resumeActivity(sessionId);
+
+          // Second pause/resume cycle
+          result.current.pauseActivity(sessionId);
+          result.current.resumeActivity(sessionId);
+        });
+
+        const sessions = result.current.getActivitySessions();
+        const session = sessions[0];
+
+        expect(session.isActive).toBe(true);
+        expect(session.pausedIntervals).toHaveLength(2);
+        expect(session.pausedIntervals[0].resumedAt).toBeDefined();
+        expect(session.pausedIntervals[1].resumedAt).toBeDefined();
+      });
+    });
+
+    describe('completeActivity', () => {
+      it('should complete session with actual minutes', () => {
+        const { result } = renderHook(() => useStore());
+
+        let sessionId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          const assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+          sessionId = result.current.getActivitySessions()[0].sessionId;
+
+          result.current.completeActivity(sessionId, 45);
+        });
+
+        const sessions = result.current.getActivitySessions();
+        const session = sessions[0];
+
+        expect(session.isActive).toBe(false);
+        expect(session.duration).toBe(45);
+        expect(session.endTime).toBeDefined();
+      });
+
+      it('should update assignment status to completed', () => {
+        const { result } = renderHook(() => useStore());
+
+        let sessionId: string;
+        let assignmentId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+          sessionId = result.current.getActivitySessions()[0].sessionId;
+
+          result.current.completeActivity(sessionId, 45);
+        });
+
+        const assignments = result.current.getChapterAssignments();
+        const assignment = assignments.find(a => a.id === assignmentId);
+        expect(assignment?.status).toBe('completed');
+        expect(assignment?.actualMinutes).toBe(45);
+      });
+
+      it('should clear active timer', () => {
+        const { result } = renderHook(() => useStore());
+
+        let sessionId: string;
+
+        act(() => {
+          result.current.switchUser('ananya');
+          result.current.clearAllData();
+
+          result.current.addChapter({
+            name: 'Test Chapter',
+            subject: 'Math',
+            studyHours: 10,
+            revisionHours: 5,
+          });
+          const chapterId = result.current.getChapters()[0].id;
+
+          result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+          const assignmentId = result.current.getChapterAssignments()[0].id;
+
+          result.current.startActivity(assignmentId);
+          sessionId = result.current.getActivitySessions()[0].sessionId;
+
+          result.current.completeActivity(sessionId, 45);
+        });
+
+        const timer = result.current.getActiveTimer();
+        expect(timer).toBeUndefined();
+      });
+    });
+  });
+});
+
+describe('Exam Management', () => {
+  describe('addExam', () => {
+    it('should create exam with correct structure', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Math Mid-Term',
+          date: '2025-12-01',
+          type: 'mid-term',
+          subjects: ['Math', 'Algebra'],
+        });
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(1);
+
+      const exam = exams[0];
+      expect(exam).toMatchObject({
+        id: expect.any(String),
+        name: 'Math Mid-Term',
+        date: '2025-12-01',
+        type: 'mid-term',
+        subjects: ['Math', 'Algebra'],
+      });
+      expect(exam.createdAt).toBeDefined();
+    });
+
+    it('should handle multiple exams', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Math Final',
+          date: '2025-12-15',
+          type: 'final',
+          subjects: ['Math'],
+        });
+
+        result.current.addExam({
+          name: 'Science Final',
+          date: '2025-12-17',
+          type: 'final',
+          subjects: ['Science'],
+        });
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(2);
+      expect(exams[0].name).toBe('Math Final');
+      expect(exams[1].name).toBe('Science Final');
+    });
+
+    it('should handle different exam types', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Weekly Test',
+          date: '2025-11-30',
+          type: 'weekly',
+          subjects: ['Math'],
+        });
+
+        result.current.addExam({
+          name: 'Monthly Test',
+          date: '2025-12-05',
+          type: 'monthly',
+          subjects: ['Science'],
+        });
+
+        result.current.addExam({
+          name: 'Quarterly Exam',
+          date: '2025-12-15',
+          type: 'quarterly',
+          subjects: ['Math', 'Science'],
+        });
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(3);
+      expect(exams[0].type).toBe('weekly');
+      expect(exams[1].type).toBe('monthly');
+      expect(exams[2].type).toBe('quarterly');
+    });
+  });
+
+  describe('updateExam', () => {
+    it('should update exam properties', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Math Exam',
+          date: '2025-12-01',
+          type: 'mid-term',
+          subjects: ['Math'],
+        });
+
+        examId = result.current.getExams()[0].id;
+
+        result.current.updateExam(examId, {
+          name: 'Updated Math Exam',
+          date: '2025-12-05',
+        });
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(1);
+      expect(exams[0].name).toBe('Updated Math Exam');
+      expect(exams[0].date).toBe('2025-12-05');
+      expect(exams[0].type).toBe('mid-term'); // unchanged
+    });
+
+    it('should update exam subjects', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Combined Exam',
+          date: '2025-12-01',
+          type: 'final',
+          subjects: ['Math'],
+        });
+
+        examId = result.current.getExams()[0].id;
+
+        result.current.updateExam(examId, {
+          subjects: ['Math', 'Science', 'English'],
+        });
+      });
+
+      const exam = result.current.getExams()[0];
+      expect(exam.subjects).toHaveLength(3);
+      expect(exam.subjects).toContain('Math');
+      expect(exam.subjects).toContain('Science');
+      expect(exam.subjects).toContain('English');
+    });
+
+    it('should not affect other exams', () => {
+      const { result } = renderHook(() => useStore());
+
+      let exam1Id: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Exam 1',
+          date: '2025-12-01',
+          type: 'mid-term',
+          subjects: ['Math'],
+        });
+
+        result.current.addExam({
+          name: 'Exam 2',
+          date: '2025-12-05',
+          type: 'final',
+          subjects: ['Science'],
+        });
+
+        exam1Id = result.current.getExams()[0].id;
+
+        result.current.updateExam(exam1Id, {
+          name: 'Updated Exam 1',
+        });
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(2);
+      expect(exams[0].name).toBe('Updated Exam 1');
+      expect(exams[1].name).toBe('Exam 2'); // unchanged
+    });
+  });
+
+  describe('deleteExam', () => {
+    it('should delete exam', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Math Exam',
+          date: '2025-12-01',
+          type: 'mid-term',
+          subjects: ['Math'],
+        });
+
+        examId = result.current.getExams()[0].id;
+
+        result.current.deleteExam(examId);
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(0);
+    });
+
+    it('should not affect other exams', () => {
+      const { result } = renderHook(() => useStore());
+
+      let exam1Id: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Exam 1',
+          date: '2025-12-01',
+          type: 'mid-term',
+          subjects: ['Math'],
+        });
+
+        result.current.addExam({
+          name: 'Exam 2',
+          date: '2025-12-05',
+          type: 'final',
+          subjects: ['Science'],
+        });
+
+        exam1Id = result.current.getExams()[0].id;
+
+        result.current.deleteExam(exam1Id);
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(1);
+      expect(exams[0].name).toBe('Exam 2');
+    });
+
+    it('should handle deleting non-existent exam', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Math Exam',
+          date: '2025-12-01',
+          type: 'mid-term',
+          subjects: ['Math'],
+        });
+
+        result.current.deleteExam('non-existent-id');
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(1);
+    });
+  });
+
+  describe('getExams', () => {
+    it('should return empty array for user with no exams', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toEqual([]);
+    });
+
+    it('should return all exams for current user', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExam({
+          name: 'Exam 1',
+          date: '2025-12-01',
+          type: 'mid-term',
+          subjects: ['Math'],
+        });
+
+        result.current.addExam({
+          name: 'Exam 2',
+          date: '2025-12-05',
+          type: 'final',
+          subjects: ['Science'],
+        });
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(2);
+    });
+
+    it('should return empty array when no user logged in', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+        result.current.logoutUser();
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toEqual([]);
+    });
+  });
+});
+
+describe('Exam Group Management', () => {
+  describe('addExamGroup', () => {
+    it('should create exam group with correct structure', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Grade 9',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [
+            { subject: 'Math', date: '2025-12-01', duration: 90, maxMarks: 100 },
+            { subject: 'Science', date: '2025-12-03', duration: 90, maxMarks: 100 },
+          ],
+          offDays: ['2025-12-02', '2025-12-04'],
+          description: 'Mid-term exams for grade 9',
+          status: 'draft',
+          isTemplate: false,
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toHaveLength(1);
+
+      const examGroup = examGroups[0];
+      expect(examGroup).toMatchObject({
+        id: expect.any(String),
+        name: 'Mid-Term Grade 9',
+        type: 'mid-term',
+        startDate: '2025-12-01',
+        endDate: '2025-12-15',
+        status: 'draft',
+        description: 'Mid-term exams for grade 9',
+        isTemplate: false,
+        version: 1,
+      });
+      expect(examGroup.subjectExams).toHaveLength(2);
+      expect(examGroup.offDays).toHaveLength(2);
+      expect(examGroup.createdAt).toBeDefined();
+    });
+
+    it('should handle multiple exam groups', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Quarterly Exams',
+          type: 'quarterly',
+          startDate: '2025-11-01',
+          endDate: '2025-11-10',
+          subjectExams: [{ subject: 'Math', date: '2025-11-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Exams',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-10',
+          subjectExams: [{ subject: 'Science', date: '2025-12-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toHaveLength(2);
+      expect(examGroups[0].name).toBe('Quarterly Exams');
+      expect(examGroups[1].name).toBe('Mid-Term Exams');
+    });
+
+    it('should handle exam group with template flag', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Standard Exam Template',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [
+            { subject: 'Math', date: '2025-12-01' },
+            { subject: 'Science', date: '2025-12-03' },
+          ],
+          offDays: [],
+          status: 'draft',
+          isTemplate: true,
+          templateName: 'Standard Template',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toHaveLength(1);
+      expect(examGroups[0].isTemplate).toBe(true);
+      expect(examGroups[0].templateName).toBe('Standard Template');
+    });
+  });
+
+  describe('updateExamGroup', () => {
+    it('should update exam group properties', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examGroupId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Grade 9',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [{ subject: 'Math', date: '2025-12-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        examGroupId = result.current.getExamGroups()[0].id;
+
+        result.current.updateExamGroup(examGroupId, {
+          name: 'Updated Mid-Term',
+          status: 'published',
+        });
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toHaveLength(1);
+      expect(examGroups[0].name).toBe('Updated Mid-Term');
+      expect(examGroups[0].status).toBe('published');
+      expect(examGroups[0].lastModified).toBeDefined();
+    });
+
+    it('should preserve unchanged properties', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examGroupId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Grade 9',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [
+            { subject: 'Math', date: '2025-12-01' },
+            { subject: 'Science', date: '2025-12-03' },
+          ],
+          offDays: ['2025-12-02'],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        examGroupId = result.current.getExamGroups()[0].id;
+
+        result.current.updateExamGroup(examGroupId, {
+          status: 'published',
+        });
+      });
+
+      const examGroup = result.current.getExamGroups()[0];
+      expect(examGroup.name).toBe('Mid-Term Grade 9');
+      expect(examGroup.type).toBe('mid-term');
+      expect(examGroup.subjectExams).toHaveLength(2);
+      expect(examGroup.offDays).toHaveLength(1);
+      expect(examGroup.status).toBe('published');
+    });
+
+    it('should not affect other exam groups', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examGroupId1: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Quarterly Exams',
+          type: 'quarterly',
+          startDate: '2025-11-01',
+          endDate: '2025-11-10',
+          subjectExams: [{ subject: 'Math', date: '2025-11-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Exams',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-10',
+          subjectExams: [{ subject: 'Science', date: '2025-12-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        examGroupId1 = result.current.getExamGroups()[0].id;
+
+        result.current.updateExamGroup(examGroupId1, {
+          status: 'published',
+        });
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toHaveLength(2);
+      expect(examGroups[0].status).toBe('published');
+      expect(examGroups[1].status).toBe('draft');
+    });
+
+    it('should update version number', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examGroupId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Grade 9',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [{ subject: 'Math', date: '2025-12-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        examGroupId = result.current.getExamGroups()[0].id;
+
+        result.current.updateExamGroup(examGroupId, {
+          version: 2,
+        });
+      });
+
+      const examGroup = result.current.getExamGroups()[0];
+      expect(examGroup.version).toBe(2);
+    });
+  });
+
+  describe('deleteExamGroup', () => {
+    it('should remove exam group', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examGroupId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Grade 9',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [{ subject: 'Math', date: '2025-12-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        examGroupId = result.current.getExamGroups()[0].id;
+
+        result.current.deleteExamGroup(examGroupId);
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toHaveLength(0);
+    });
+
+    it('should not affect other exam groups', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examGroupId1: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Quarterly Exams',
+          type: 'quarterly',
+          startDate: '2025-11-01',
+          endDate: '2025-11-10',
+          subjectExams: [{ subject: 'Math', date: '2025-11-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Exams',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-10',
+          subjectExams: [{ subject: 'Science', date: '2025-12-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        examGroupId1 = result.current.getExamGroups()[0].id;
+
+        result.current.deleteExamGroup(examGroupId1);
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toHaveLength(1);
+      expect(examGroups[0].name).toBe('Mid-Term Exams');
+    });
+
+    it('should handle deleting non-existent exam group', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Grade 9',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [{ subject: 'Math', date: '2025-12-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        result.current.deleteExamGroup('non-existent-id');
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toHaveLength(1);
+    });
+  });
+
+  describe('applyExamGroup', () => {
+    it('should create individual exams from subject exams', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examGroupId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Grade 9',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [
+            { subject: 'Math', date: '2025-12-01', duration: 90, maxMarks: 100 },
+            { subject: 'Science', date: '2025-12-03', duration: 90, maxMarks: 100 },
+            { subject: 'English', date: '2025-12-05', duration: 90, maxMarks: 100 },
+          ],
+          offDays: [],
+          status: 'published',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        examGroupId = result.current.getExamGroups()[0].id;
+
+        result.current.applyExamGroup(examGroupId);
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(3);
+      expect(exams[0].name).toContain('Math');
+      expect(exams[0].date).toBe('2025-12-01');
+      expect(exams[0].type).toBe('mid-term');
+      expect(exams[1].name).toContain('Science');
+      expect(exams[2].name).toContain('English');
+    });
+
+    it('should create off days from exam group', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examGroupId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Grade 9',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [
+            { subject: 'Math', date: '2025-12-01' },
+          ],
+          offDays: ['2025-12-02', '2025-12-04', '2025-12-06'],
+          status: 'published',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        examGroupId = result.current.getExamGroups()[0].id;
+
+        result.current.applyExamGroup(examGroupId);
+      });
+
+      const offDays = result.current.getOffDays();
+      expect(offDays).toHaveLength(3);
+      expect(offDays[0].date).toBe('2025-12-02');
+      expect(offDays[0].reason).toContain('Mid-Term Grade 9');
+      expect(offDays[1].date).toBe('2025-12-04');
+      expect(offDays[2].date).toBe('2025-12-06');
+    });
+
+    it('should mark exam group as applied', () => {
+      const { result } = renderHook(() => useStore());
+
+      let examGroupId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Grade 9',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-15',
+          subjectExams: [
+            { subject: 'Math', date: '2025-12-01' },
+          ],
+          offDays: [],
+          status: 'published',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        examGroupId = result.current.getExamGroups()[0].id;
+
+        result.current.applyExamGroup(examGroupId);
+      });
+
+      const examGroup = result.current.getExamGroups()[0];
+      expect(examGroup.status).toBe('applied');
+      expect(examGroup.appliedDate).toBeDefined();
+    });
+
+    it('should handle applying non-existent exam group', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.applyExamGroup('non-existent-id');
+      });
+
+      const exams = result.current.getExams();
+      expect(exams).toHaveLength(0);
+    });
+  });
+
+  describe('getExamGroups', () => {
+    it('should return empty array for user with no exam groups', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toEqual([]);
+    });
+
+    it('should return all exam groups for current user', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addExamGroup({
+          name: 'Quarterly Exams',
+          type: 'quarterly',
+          startDate: '2025-11-01',
+          endDate: '2025-11-10',
+          subjectExams: [{ subject: 'Math', date: '2025-11-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+
+        result.current.addExamGroup({
+          name: 'Mid-Term Exams',
+          type: 'mid-term',
+          startDate: '2025-12-01',
+          endDate: '2025-12-10',
+          subjectExams: [{ subject: 'Science', date: '2025-12-01' }],
+          offDays: [],
+          status: 'draft',
+          lastModified: new Date().toISOString(),
+          version: 1,
+        });
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toHaveLength(2);
+    });
+
+    it('should return empty array when no user logged in', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+        result.current.logoutUser();
+      });
+
+      const examGroups = result.current.getExamGroups();
+      expect(examGroups).toEqual([]);
+    });
+  });
+});
+
+describe('Daily Log Management', () => {
+  describe('addDailyLog', () => {
+    it('should create daily log with correct structure', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addDailyLog({
+          date: '2025-11-25',
+          tasks: [
+            {
+              id: 'task-1',
+              chapterId: 'ch-1',
+              subject: 'Math',
+              chapterName: 'Algebra',
+              allocatedMinutes: 60,
+              actualMinutes: 55,
+              status: 'completed',
+              priority: 1,
+              date: '2025-11-25',
+            },
+            {
+              id: 'task-2',
+              chapterId: 'ch-2',
+              subject: 'Science',
+              chapterName: 'Physics',
+              allocatedMinutes: 45,
+              actualMinutes: 50,
+              status: 'completed',
+              priority: 2,
+              date: '2025-11-25',
+            },
+          ],
+          totalAllocatedMinutes: 105,
+          totalActualMinutes: 105,
+        });
+      });
+
+      const dailyLogs = result.current.getDailyLogs();
+      expect(dailyLogs).toHaveLength(1);
+
+      const log = dailyLogs[0];
+      expect(log).toMatchObject({
+        id: expect.any(String),
+        date: '2025-11-25',
+        totalAllocatedMinutes: 105,
+        totalActualMinutes: 105,
+      });
+      expect(log.tasks).toHaveLength(2);
+      expect(log.createdAt).toBeDefined();
+    });
+
+    it('should handle multiple daily logs', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addDailyLog({
+          date: '2025-11-25',
+          tasks: [
+            {
+              id: 'task-1',
+              chapterId: 'ch-1',
+              subject: 'Math',
+              chapterName: 'Algebra',
+              allocatedMinutes: 60,
+              status: 'completed',
+              priority: 1,
+              date: '2025-11-25',
+            },
+          ],
+          totalAllocatedMinutes: 60,
+          totalActualMinutes: 55,
+        });
+
+        result.current.addDailyLog({
+          date: '2025-11-26',
+          tasks: [
+            {
+              id: 'task-2',
+              chapterId: 'ch-2',
+              subject: 'Science',
+              chapterName: 'Physics',
+              allocatedMinutes: 45,
+              status: 'pending',
+              priority: 1,
+              date: '2025-11-26',
+            },
+          ],
+          totalAllocatedMinutes: 45,
+          totalActualMinutes: 0,
+        });
+      });
+
+      const dailyLogs = result.current.getDailyLogs();
+      expect(dailyLogs).toHaveLength(2);
+      expect(dailyLogs[0].date).toBe('2025-11-25');
+      expect(dailyLogs[1].date).toBe('2025-11-26');
+    });
+
+    it('should handle tasks with different statuses', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addDailyLog({
+          date: '2025-11-25',
+          tasks: [
+            {
+              id: 'task-1',
+              chapterId: 'ch-1',
+              subject: 'Math',
+              chapterName: 'Algebra',
+              allocatedMinutes: 60,
+              status: 'completed',
+              priority: 1,
+              date: '2025-11-25',
+            },
+            {
+              id: 'task-2',
+              chapterId: 'ch-2',
+              subject: 'Science',
+              chapterName: 'Physics',
+              allocatedMinutes: 45,
+              status: 'in-progress',
+              priority: 2,
+              date: '2025-11-25',
+            },
+            {
+              id: 'task-3',
+              chapterId: 'ch-3',
+              subject: 'English',
+              chapterName: 'Grammar',
+              allocatedMinutes: 30,
+              status: 'pending',
+              priority: 3,
+              date: '2025-11-25',
+            },
+            {
+              id: 'task-4',
+              chapterId: 'ch-4',
+              subject: 'History',
+              chapterName: 'Ancient History',
+              allocatedMinutes: 40,
+              status: 'skipped',
+              priority: 4,
+              date: '2025-11-25',
+            },
+          ],
+          totalAllocatedMinutes: 175,
+          totalActualMinutes: 60,
+        });
+      });
+
+      const dailyLogs = result.current.getDailyLogs();
+      const log = dailyLogs[0];
+      expect(log.tasks).toHaveLength(4);
+      expect(log.tasks[0].status).toBe('completed');
+      expect(log.tasks[1].status).toBe('in-progress');
+      expect(log.tasks[2].status).toBe('pending');
+      expect(log.tasks[3].status).toBe('skipped');
+    });
+  });
+
+  describe('updateDailyTask', () => {
+    it('should update task properties', () => {
+      const { result } = renderHook(() => useStore());
+
+      let logId: string;
+      let taskId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addDailyLog({
+          date: '2025-11-25',
+          tasks: [
+            {
+              id: 'task-1',
+              chapterId: 'ch-1',
+              subject: 'Math',
+              chapterName: 'Algebra',
+              allocatedMinutes: 60,
+              actualMinutes: 0,
+              status: 'pending',
+              priority: 1,
+              date: '2025-11-25',
+            },
+          ],
+          totalAllocatedMinutes: 60,
+          totalActualMinutes: 0,
+        });
+
+        logId = result.current.getDailyLogs()[0].id;
+        taskId = result.current.getDailyLogs()[0].tasks[0].id;
+
+        result.current.updateDailyTask(logId, taskId, {
+          actualMinutes: 55,
+          status: 'completed',
+        });
+      });
+
+      const dailyLog = result.current.getDailyLogs()[0];
+      const task = dailyLog.tasks[0];
+      expect(task.actualMinutes).toBe(55);
+      expect(task.status).toBe('completed');
+    });
+
+    it('should recalculate total actual minutes', () => {
+      const { result } = renderHook(() => useStore());
+
+      let logId: string;
+      let task1Id: string;
+      let task2Id: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addDailyLog({
+          date: '2025-11-25',
+          tasks: [
+            {
+              id: 'task-1',
+              chapterId: 'ch-1',
+              subject: 'Math',
+              chapterName: 'Algebra',
+              allocatedMinutes: 60,
+              actualMinutes: 0,
+              status: 'pending',
+              priority: 1,
+              date: '2025-11-25',
+            },
+            {
+              id: 'task-2',
+              chapterId: 'ch-2',
+              subject: 'Science',
+              chapterName: 'Physics',
+              allocatedMinutes: 45,
+              actualMinutes: 0,
+              status: 'pending',
+              priority: 2,
+              date: '2025-11-25',
+            },
+          ],
+          totalAllocatedMinutes: 105,
+          totalActualMinutes: 0,
+        });
+
+        logId = result.current.getDailyLogs()[0].id;
+        task1Id = result.current.getDailyLogs()[0].tasks[0].id;
+        task2Id = result.current.getDailyLogs()[0].tasks[1].id;
+
+        result.current.updateDailyTask(logId, task1Id, {
+          actualMinutes: 55,
+          status: 'completed',
+        });
+
+        result.current.updateDailyTask(logId, task2Id, {
+          actualMinutes: 50,
+          status: 'completed',
+        });
+      });
+
+      const dailyLog = result.current.getDailyLogs()[0];
+      expect(dailyLog.totalActualMinutes).toBe(105);
+    });
+
+    it('should preserve unchanged task properties', () => {
+      const { result } = renderHook(() => useStore());
+
+      let logId: string;
+      let taskId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addDailyLog({
+          date: '2025-11-25',
+          tasks: [
+            {
+              id: 'task-1',
+              chapterId: 'ch-1',
+              subject: 'Math',
+              chapterName: 'Algebra',
+              allocatedMinutes: 60,
+              actualMinutes: 0,
+              status: 'pending',
+              priority: 1,
+              date: '2025-11-25',
+            },
+          ],
+          totalAllocatedMinutes: 60,
+          totalActualMinutes: 0,
+        });
+
+        logId = result.current.getDailyLogs()[0].id;
+        taskId = result.current.getDailyLogs()[0].tasks[0].id;
+
+        result.current.updateDailyTask(logId, taskId, {
+          status: 'in-progress',
+        });
+      });
+
+      const task = result.current.getDailyLogs()[0].tasks[0];
+      expect(task.chapterId).toBe('ch-1');
+      expect(task.subject).toBe('Math');
+      expect(task.chapterName).toBe('Algebra');
+      expect(task.allocatedMinutes).toBe(60);
+      expect(task.priority).toBe(1);
+      expect(task.status).toBe('in-progress');
+    });
+
+    it('should not affect other tasks in log', () => {
+      const { result } = renderHook(() => useStore());
+
+      let logId: string;
+      let task1Id: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addDailyLog({
+          date: '2025-11-25',
+          tasks: [
+            {
+              id: 'task-1',
+              chapterId: 'ch-1',
+              subject: 'Math',
+              chapterName: 'Algebra',
+              allocatedMinutes: 60,
+              actualMinutes: 0,
+              status: 'pending',
+              priority: 1,
+              date: '2025-11-25',
+            },
+            {
+              id: 'task-2',
+              chapterId: 'ch-2',
+              subject: 'Science',
+              chapterName: 'Physics',
+              allocatedMinutes: 45,
+              actualMinutes: 0,
+              status: 'pending',
+              priority: 2,
+              date: '2025-11-25',
+            },
+          ],
+          totalAllocatedMinutes: 105,
+          totalActualMinutes: 0,
+        });
+
+        logId = result.current.getDailyLogs()[0].id;
+        task1Id = result.current.getDailyLogs()[0].tasks[0].id;
+
+        result.current.updateDailyTask(logId, task1Id, {
+          actualMinutes: 55,
+          status: 'completed',
+        });
+      });
+
+      const tasks = result.current.getDailyLogs()[0].tasks;
+      expect(tasks[0].status).toBe('completed');
+      expect(tasks[1].status).toBe('pending');
+    });
+
+    it('should handle updating actualMinutes to undefined', () => {
+      const { result } = renderHook(() => useStore());
+
+      let logId: string;
+      let taskId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addDailyLog({
+          date: '2025-11-25',
+          tasks: [
+            {
+              id: 'task-1',
+              chapterId: 'ch-1',
+              subject: 'Math',
+              chapterName: 'Algebra',
+              allocatedMinutes: 60,
+              actualMinutes: 55,
+              status: 'completed',
+              priority: 1,
+              date: '2025-11-25',
+            },
+          ],
+          totalAllocatedMinutes: 60,
+          totalActualMinutes: 55,
+        });
+
+        logId = result.current.getDailyLogs()[0].id;
+        taskId = result.current.getDailyLogs()[0].tasks[0].id;
+
+        result.current.updateDailyTask(logId, taskId, {
+          actualMinutes: undefined,
+          status: 'pending',
+        });
+      });
+
+      const dailyLog = result.current.getDailyLogs()[0];
+      const task = dailyLog.tasks[0];
+      expect(task.actualMinutes).toBeUndefined();
+      expect(dailyLog.totalActualMinutes).toBe(0);
+    });
+  });
+
+  describe('getDailyLogs', () => {
+    it('should return empty array for user with no logs', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+      });
+
+      const dailyLogs = result.current.getDailyLogs();
+      expect(dailyLogs).toEqual([]);
+    });
+
+    it('should return all daily logs for current user', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addDailyLog({
+          date: '2025-11-25',
+          tasks: [],
+          totalAllocatedMinutes: 0,
+          totalActualMinutes: 0,
+        });
+
+        result.current.addDailyLog({
+          date: '2025-11-26',
+          tasks: [],
+          totalAllocatedMinutes: 0,
+          totalActualMinutes: 0,
+        });
+      });
+
+      const dailyLogs = result.current.getDailyLogs();
+      expect(dailyLogs).toHaveLength(2);
+    });
+
+    it('should return empty array when no user logged in', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+        result.current.logoutUser();
+      });
+
+      const dailyLogs = result.current.getDailyLogs();
+      expect(dailyLogs).toEqual([]);
+    });
+  });
+});
+
+describe('Off Day Management', () => {
+  describe('addOffDay', () => {
+    it('should create off day with correct structure', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addOffDay({
+          date: '2025-12-25',
+          reason: 'Christmas Holiday',
+        });
+      });
+
+      const offDays = result.current.getOffDays();
+      expect(offDays).toHaveLength(1);
+
+      const offDay = offDays[0];
+      expect(offDay).toMatchObject({
+        id: expect.any(String),
+        date: '2025-12-25',
+        reason: 'Christmas Holiday',
+      });
+      expect(offDay.createdAt).toBeDefined();
+    });
+
+    it('should handle multiple off days', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addOffDay({
+          date: '2025-12-25',
+          reason: 'Christmas',
+        });
+
+        result.current.addOffDay({
+          date: '2026-01-01',
+          reason: 'New Year',
+        });
+
+        result.current.addOffDay({
+          date: '2026-01-26',
+          reason: 'Republic Day',
+        });
+      });
+
+      const offDays = result.current.getOffDays();
+      expect(offDays).toHaveLength(3);
+      expect(offDays[0].date).toBe('2025-12-25');
+      expect(offDays[1].date).toBe('2026-01-01');
+      expect(offDays[2].date).toBe('2026-01-26');
+    });
+  });
+
+  describe('deleteOffDay', () => {
+    it('should delete off day', () => {
+      const { result } = renderHook(() => useStore());
+
+      let offDayId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addOffDay({
+          date: '2025-12-25',
+          reason: 'Holiday',
+        });
+
+        offDayId = result.current.getOffDays()[0].id;
+
+        result.current.deleteOffDay(offDayId);
+      });
+
+      const offDays = result.current.getOffDays();
+      expect(offDays).toHaveLength(0);
+    });
+
+    it('should not affect other off days', () => {
+      const { result } = renderHook(() => useStore());
+
+      let offDay1Id: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addOffDay({
+          date: '2025-12-25',
+          reason: 'Christmas',
+        });
+
+        result.current.addOffDay({
+          date: '2026-01-01',
+          reason: 'New Year',
+        });
+
+        offDay1Id = result.current.getOffDays()[0].id;
+
+        result.current.deleteOffDay(offDay1Id);
+      });
+
+      const offDays = result.current.getOffDays();
+      expect(offDays).toHaveLength(1);
+      expect(offDays[0].reason).toBe('New Year');
+    });
+
+    it('should handle deleting non-existent off day', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addOffDay({
+          date: '2025-12-25',
+          reason: 'Holiday',
+        });
+
+        result.current.deleteOffDay('non-existent-id');
+      });
+
+      const offDays = result.current.getOffDays();
+      expect(offDays).toHaveLength(1);
+    });
+  });
+
+  describe('getOffDays', () => {
+    it('should return empty array for user with no off days', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+      });
+
+      const offDays = result.current.getOffDays();
+      expect(offDays).toEqual([]);
+    });
+
+    it('should return all off days for current user', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addOffDay({
+          date: '2025-12-25',
+          reason: 'Christmas',
+        });
+
+        result.current.addOffDay({
+          date: '2026-01-01',
+          reason: 'New Year',
+        });
+      });
+
+      const offDays = result.current.getOffDays();
+      expect(offDays).toHaveLength(2);
+    });
+
+    it('should return empty array when no user logged in', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+        result.current.logoutUser();
+      });
+
+      const offDays = result.current.getOffDays();
+      expect(offDays).toEqual([]);
+    });
+  });
+});
+
+describe('Settings Management', () => {
+  describe('updateSettings', () => {
+    it('should update settings properties', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.updateSettings({
+          dailyStudyHours: 6,
+          breakMinutes: 15,
+        });
+      });
+
+      const settings = result.current.getSettings();
+      expect(settings.dailyStudyHours).toBe(6);
+      expect(settings.breakMinutes).toBe(15);
+    });
+
+    it('should preserve unchanged settings', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        const initialSettings = result.current.getSettings();
+        const initialStudySession = initialSettings.studySessionMinutes;
+
+        result.current.updateSettings({
+          dailyStudyHours: 7,
+        });
+
+        const updatedSettings = result.current.getSettings();
+        expect(updatedSettings.studySessionMinutes).toBe(initialStudySession);
+      });
+    });
+
+    it('should update theme settings', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.updateSettings({
+          theme: 'dark',
+          colorTheme: 'blue',
+        });
+      });
+
+      const settings = result.current.getSettings();
+      expect(settings.theme).toBe('dark');
+      expect(settings.colorTheme).toBe('blue');
+    });
+
+    it('should update parent mode', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.updateSettings({
+          parentModeEnabled: true,
+        });
+      });
+
+      const settings = result.current.getSettings();
+      expect(settings.parentModeEnabled).toBe(true);
+    });
+  });
+
+  describe('getSettings', () => {
+    it('should return default settings for new user', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+      });
+
+      const settings = result.current.getSettings();
+      expect(settings).toBeDefined();
+      expect(settings.dailyStudyHours).toBeDefined();
+      expect(settings.breakMinutes).toBeDefined();
+      expect(settings.studySessionMinutes).toBeDefined();
+    });
+
+    it('should return default settings when no user logged in', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+        result.current.logoutUser();
+      });
+
+      const settings = result.current.getSettings();
+      // getSettings returns default settings structure even with no user
+      expect(settings).toBeDefined();
+      expect(typeof settings).toBe('object');
+    });
+  });
+});
+
+describe('Timer Management', () => {
+  describe('updateTimerState', () => {
+    it('should update timer state properties', () => {
+      const { result } = renderHook(() => useStore());
+
+      let chapterId: string;
+      let assignmentId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        chapterId = result.current.getChapters()[0].id;
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+        assignmentId = result.current.getChapterAssignments()[0].id;
+
+        result.current.startActivity(assignmentId);
+
+        result.current.updateTimerState({
+          isActive: false,
+          totalPausedMs: 5000,
+        });
+      });
+
+      const timer = result.current.getActiveTimer();
+      expect(timer).toBeDefined();
+      expect(timer?.isActive).toBe(false);
+      expect(timer?.totalPausedMs).toBe(5000);
+    });
+
+    it('should preserve other timer properties', () => {
+      const { result } = renderHook(() => useStore());
+
+      let chapterId: string;
+      let assignmentId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        chapterId = result.current.getChapters()[0].id;
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+        assignmentId = result.current.getChapterAssignments()[0].id;
+
+        result.current.startActivity(assignmentId);
+
+        const initialTimer = result.current.getActiveTimer();
+        const initialStartTime = initialTimer?.startTime;
+
+        result.current.updateTimerState({
+          totalPausedMs: 3000,
+        });
+
+        const updatedTimer = result.current.getActiveTimer();
+        expect(updatedTimer?.startTime).toBe(initialStartTime);
+      });
+    });
+  });
+
+  describe('resetTimer', () => {
+    it('should clear active timer', () => {
+      const { result } = renderHook(() => useStore());
+
+      let chapterId: string;
+      let assignmentId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        chapterId = result.current.getChapters()[0].id;
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+        assignmentId = result.current.getChapterAssignments()[0].id;
+
+        result.current.startActivity(assignmentId);
+        result.current.resetTimer();
+      });
+
+      const timer = result.current.getActiveTimer();
+      expect(timer).toBeUndefined();
+    });
+  });
+
+  describe('getActiveTimer', () => {
+    it('should return active timer when exists', () => {
+      const { result } = renderHook(() => useStore());
+
+      let chapterId: string;
+      let assignmentId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        chapterId = result.current.getChapters()[0].id;
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+        assignmentId = result.current.getChapterAssignments()[0].id;
+
+        result.current.startActivity(assignmentId);
+      });
+
+      const timer = result.current.getActiveTimer();
+      expect(timer).toBeDefined();
+      expect(timer?.assignmentId).toBe(assignmentId);
+    });
+
+    it('should return undefined when no timer exists', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+      });
+
+      const timer = result.current.getActiveTimer();
+      expect(timer).toBeUndefined();
+    });
+  });
+});
+
+describe('Assignment Advanced Operations', () => {
+  describe('updateAssignment', () => {
+    it('should update assignment properties', () => {
+      const { result } = renderHook(() => useStore());
+
+      let chapterId: string;
+      let assignmentId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        chapterId = result.current.getChapters()[0].id;
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+        assignmentId = result.current.getChapterAssignments()[0].id;
+
+        result.current.updateAssignment(assignmentId, {
+          plannedMinutes: 90,
+          status: 'completed',
+        });
+      });
+
+      const assignments = result.current.getChapterAssignments();
+      expect(assignments).toHaveLength(1);
+      expect(assignments[0].plannedMinutes).toBe(90);
+      expect(assignments[0].status).toBe('completed');
+    });
+
+    it('should not affect other assignments', () => {
+      const { result } = renderHook(() => useStore());
+
+      let chapterId: string;
+      let assignment1Id: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Chapter 1',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        result.current.addChapter({
+          name: 'Chapter 2',
+          subject: 'Science',
+          studyHours: 8,
+          revisionHours: 4,
+        });
+
+        const chapters = result.current.getChapters();
+        chapterId = chapters[0].id;
+
+        result.current.scheduleChapter(chapters[0].id, '2025-11-25', 'study', 60);
+        result.current.scheduleChapter(chapters[1].id, '2025-11-26', 'study', 45);
+
+        assignment1Id = result.current.getChapterAssignments()[0].id;
+
+        result.current.updateAssignment(assignment1Id, {
+          plannedMinutes: 75,
+        });
+      });
+
+      const assignments = result.current.getChapterAssignments();
+      expect(assignments).toHaveLength(2);
+      expect(assignments[0].plannedMinutes).toBe(75);
+      expect(assignments[1].plannedMinutes).toBe(45);
+    });
+  });
+
+  describe('deleteAssignment', () => {
+    it('should delete assignment', () => {
+      const { result } = renderHook(() => useStore());
+
+      let chapterId: string;
+      let assignmentId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        chapterId = result.current.getChapters()[0].id;
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+        assignmentId = result.current.getChapterAssignments()[0].id;
+
+        result.current.deleteAssignment(assignmentId);
+      });
+
+      const assignments = result.current.getChapterAssignments();
+      expect(assignments).toHaveLength(0);
+    });
+
+    it('should not affect other assignments', () => {
+      const { result } = renderHook(() => useStore());
+
+      let assignment1Id: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Chapter 1',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        result.current.addChapter({
+          name: 'Chapter 2',
+          subject: 'Science',
+          studyHours: 8,
+          revisionHours: 4,
+        });
+
+        const chapters = result.current.getChapters();
+
+        result.current.scheduleChapter(chapters[0].id, '2025-11-25', 'study', 60);
+        result.current.scheduleChapter(chapters[1].id, '2025-11-26', 'study', 45);
+
+        assignment1Id = result.current.getChapterAssignments()[0].id;
+
+        result.current.deleteAssignment(assignment1Id);
+      });
+
+      const assignments = result.current.getChapterAssignments();
+      expect(assignments).toHaveLength(1);
+      expect(assignments[0].plannedMinutes).toBe(45);
+    });
+  });
+
+  describe('getAssignmentsForDate', () => {
+    it('should return assignments for specific date', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Chapter 1',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        result.current.addChapter({
+          name: 'Chapter 2',
+          subject: 'Science',
+          studyHours: 8,
+          revisionHours: 4,
+        });
+
+        const chapters = result.current.getChapters();
+
+        result.current.scheduleChapter(chapters[0].id, '2025-11-25', 'study', 60);
+        result.current.scheduleChapter(chapters[1].id, '2025-11-25', 'study', 45);
+        result.current.scheduleChapter(chapters[0].id, '2025-11-26', 'revision', 30);
+      });
+
+      const assignmentsNov25 = result.current.getAssignmentsForDate('2025-11-25');
+      expect(assignmentsNov25).toHaveLength(2);
+
+      const assignmentsNov26 = result.current.getAssignmentsForDate('2025-11-26');
+      expect(assignmentsNov26).toHaveLength(1);
+    });
+
+    it('should return empty array for date with no assignments', () => {
+      const { result } = renderHook(() => useStore());
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        const chapterId = result.current.getChapters()[0].id;
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+      });
+
+      const assignments = result.current.getAssignmentsForDate('2025-12-01');
+      expect(assignments).toEqual([]);
+    });
+  });
+
+  describe('getAssignmentsForChapter', () => {
+    it('should return all assignments for specific chapter', () => {
+      const { result } = renderHook(() => useStore());
+
+      let chapterId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        chapterId = result.current.getChapters()[0].id;
+
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+        result.current.scheduleChapter(chapterId, '2025-11-27', 'revision', 45);
+        result.current.scheduleChapter(chapterId, '2025-11-29', 'revision', 30);
+      });
+
+      const assignments = result.current.getAssignmentsForChapter(chapterId);
+      expect(assignments).toHaveLength(3);
+    });
+
+    it('should return empty array for chapter with no assignments', () => {
+      const { result } = renderHook(() => useStore());
+
+      let chapterId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        chapterId = result.current.getChapters()[0].id;
+      });
+
+      const assignments = result.current.getAssignmentsForChapter(chapterId);
+      expect(assignments).toEqual([]);
+    });
+  });
+
+  describe('getAssignmentsForPlan', () => {
+    it('should return assignments for specific plan', () => {
+      const { result } = renderHook(() => useStore());
+
+      let planId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addStudyPlan({
+          name: 'Test Plan',
+          startDate: '2025-11-01',
+          endDate: '2025-12-31',
+          totalStudyHours: 100,
+          totalRevisionHours: 50,
+          completedStudyHours: 0,
+          completedRevisionHours: 0,
+          status: 'draft',
+        });
+
+        planId = result.current.getStudyPlans()[0].id;
+
+        result.current.addChapter({
+          name: 'Chapter 1',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        const chapterId = result.current.getChapters()[0].id;
+
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60, planId);
+        result.current.scheduleChapter(chapterId, '2025-11-27', 'revision', 45, planId);
+      });
+
+      const assignments = result.current.getAssignmentsForPlan(planId);
+      expect(assignments).toHaveLength(2);
+    });
+
+    it('should return empty array for plan with no assignments', () => {
+      const { result } = renderHook(() => useStore());
+
+      let planId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addStudyPlan({
+          name: 'Test Plan',
+          startDate: '2025-11-01',
+          endDate: '2025-12-31',
+          totalStudyHours: 100,
+          totalRevisionHours: 50,
+          completedStudyHours: 0,
+          completedRevisionHours: 0,
+          status: 'draft',
+        });
+
+        planId = result.current.getStudyPlans()[0].id;
+      });
+
+      const assignments = result.current.getAssignmentsForPlan(planId);
+      expect(assignments).toEqual([]);
+    });
+  });
+
+  describe('linkAssignmentToPlan', () => {
+    it('should link assignment to plan', () => {
+      const { result } = renderHook(() => useStore());
+
+      let planId: string;
+      let assignmentId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        const chapterId = result.current.getChapters()[0].id;
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60);
+
+        assignmentId = result.current.getChapterAssignments()[0].id;
+
+        result.current.addStudyPlan({
+          name: 'Test Plan',
+          startDate: '2025-11-01',
+          endDate: '2025-12-31',
+          totalStudyHours: 100,
+          totalRevisionHours: 50,
+          completedStudyHours: 0,
+          completedRevisionHours: 0,
+          status: 'draft',
+        });
+
+        planId = result.current.getStudyPlans()[0].id;
+
+        result.current.linkAssignmentToPlan(assignmentId, planId);
+      });
+
+      const assignments = result.current.getChapterAssignments();
+      expect(assignments[0].planId).toBe(planId);
+    });
+
+    it('should handle linking assignment to different plan', () => {
+      const { result } = renderHook(() => useStore());
+
+      let plan1Id: string;
+      let plan2Id: string;
+      let assignmentId: string;
+
+      act(() => {
+        result.current.switchUser('ananya');
+        result.current.clearAllData();
+
+        result.current.addChapter({
+          name: 'Test Chapter',
+          subject: 'Math',
+          studyHours: 10,
+          revisionHours: 5,
+        });
+
+        const chapterId = result.current.getChapters()[0].id;
+
+        result.current.addStudyPlan({
+          name: 'Plan 1',
+          startDate: '2025-11-01',
+          endDate: '2025-12-31',
+          totalStudyHours: 100,
+          totalRevisionHours: 50,
+          completedStudyHours: 0,
+          completedRevisionHours: 0,
+          status: 'draft',
+        });
+
+        plan1Id = result.current.getStudyPlans()[0].id;
+
+        result.current.scheduleChapter(chapterId, '2025-11-25', 'study', 60, plan1Id);
+        assignmentId = result.current.getChapterAssignments()[0].id;
+
+        result.current.addStudyPlan({
+          name: 'Plan 2',
+          startDate: '2025-11-01',
+          endDate: '2025-12-31',
+          totalStudyHours: 80,
+          totalRevisionHours: 40,
+          completedStudyHours: 0,
+          completedRevisionHours: 0,
+          status: 'draft',
+        });
+
+        plan2Id = result.current.getStudyPlans()[1].id;
+
+        result.current.linkAssignmentToPlan(assignmentId, plan2Id);
+      });
+
+      const assignments = result.current.getChapterAssignments();
+      expect(assignments[0].planId).toBe(plan2Id);
+    });
+  });
 });
