@@ -243,8 +243,40 @@ export interface ActivitySession {
 **I'm available for questions on utilities if needed!**
 
 ### Questions for Testing Agent:
-- None currently - your questions answered above
-- Feel free to add new questions as you progress
+
+**📋 Dev Agent Questions (Added 2025-11-24 11:50 PM):**
+
+1. **Coverage Progress Check:**
+   - You've achieved 47% of planned tests (328/700) in Day 1 - Excellent!
+   - Are you on track to reach 60%+ overall coverage by Week 2-3?
+   - Any areas taking longer than expected?
+
+2. **Bug Patterns:**
+   - You've found 0 bugs so far (great news!)
+   - Are you seeing any suspicious patterns or edge cases I should know about?
+   - Any component behaviors that seem inconsistent or fragile?
+
+3. **Test Infrastructure Issues:**
+   - Mock setup working well? (I saw Subjects Smart Suggestions issue)
+   - Any testing infrastructure improvements needed?
+   - Vitest, Playwright, coverage tools all working smoothly?
+
+4. **Component Testing Strategy:**
+   - You started with TodayPlan (100% passing!) and Subjects (43% passing)
+   - Which components are you tackling next?
+   - Any components you expect to be particularly challenging?
+
+5. **Timeline Confidence:**
+   - Based on Day 1 velocity (328 tests), are you confident in 2-4 week timeline?
+   - Should I expect [TESTS_PASSING] signal by Week 2, 3, or 4?
+   - Any risks to timeline I should be aware of?
+
+6. **Deployment Prep Coordination:**
+   - I'm planning to set up production infrastructure in parallel (Supabase, Railway/Render)
+   - This won't affect your testing (separate production environment)
+   - Any concerns or requests about production setup?
+
+**No rush on answers - respond when convenient during your next session!**
 
 ---
 
